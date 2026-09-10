@@ -1,0 +1,1 @@
+window.DELA_CONFIG={SB_URL:'https://ungkyimakkejsdsgkglz.supabase.co',SB_KEY:'sb_publishable_8wnAdenufyvzy0vhYOeIhw_T5tot532'};
