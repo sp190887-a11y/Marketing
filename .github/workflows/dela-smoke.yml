@@ -16,13 +16,13 @@ jobs:
         run: |
           set -euo pipefail
           base='https://sp190887-a11y.github.io/Marketing/dela'
-          for i in $(seq 1 12); do
+          for i in $(seq 1 18); do
             if curl -fsSL --max-time 20 "$base/" -o /tmp/dela-index.html; then
-              if grep -q '<title>Дела</title>' /tmp/dela-index.html && grep -q 'id="auth"' /tmp/dela-index.html && grep -q 'ungkyimakkejsdsgkglz.supabase.co' /tmp/dela-index.html; then
+              if grep -q '<title>Дела</title>' /tmp/dela-index.html && grep -q 'id="auth"' /tmp/dela-index.html && grep -q 'ungkyimakkejsdsgkglz.supabase.co' /tmp/dela-index.html && grep -q 'id="pickfile"' /tmp/dela-index.html && grep -q 'Файл не загрузился (' /tmp/dela-index.html; then
                 break
               fi
             fi
-            if [ "$i" = 12 ]; then
+            if [ "$i" = 18 ]; then
               echo 'Live Dela index did not become valid in time' >&2
               exit 1
             fi
@@ -38,7 +38,7 @@ jobs:
           assert {'192x192','512x512'} <= sizes
           PY
           curl -fsSL --max-time 20 "$base/sw.js" -o /tmp/sw.js
-          grep -q "const C='dela-v1'" /tmp/sw.js
+          grep -q "const C='dela-v2'" /tmp/sw.js
           curl -fsSI --max-time 20 "$base/icon-192.png" | grep -qi '^content-type: image/png'
           curl -fsSI --max-time 20 "$base/icon-512.png" | grep -qi '^content-type: image/png'
           echo 'LIVE_DELA_SMOKE=PASS'
