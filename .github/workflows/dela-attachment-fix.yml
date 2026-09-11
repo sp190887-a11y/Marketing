@@ -1,0 +1,64 @@
+name: Apply Dela attachment fix
+
+on:
+  push:
+    paths:
+      - '.github/workflows/dela-attachment-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch and validate Dela
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+
+          p=Path('dela/index.html')
+          s=p.read_text(encoding='utf-8')
+
+          old_ui='<label class="pick">Прикрепить<input id="filein" type="file" multiple hidden></label></div><div id="atts"></div>'
+          new_ui='<button id="pickfile" type="button" class="pick">Прикрепить</button><input id="filein" class="fileinput" type="file" multiple></div><div id="uploadmsg" class="muted"></div><div id="atts"></div>'
+          assert old_ui in s, 'old file picker markup not found'
+          s=s.replace(old_ui,new_ui,1)
+
+          assert '.banner{' in s
+          s=s.replace('.banner{','.fileinput{position:fixed;left:-10000px;top:-10000px;width:1px;height:1px;opacity:0}.banner{',1)
+
+          new_upload=r'''function userId(){if(s?.user?.id)return s.user.id;try{let p=s.access_token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');p+='='.repeat((4-p.length%4)%4);return JSON.parse(atob(p)).sub}catch{return null}}async function upload(F){let x=task(eid),uid=userId();if(!x)throw Error('Задача не найдена');if(!uid)throw Error('Не удалось определить пользователя. Перезайдите в приложение.');let safe=(F.name||'file').replace(/[^a-zA-Z0-9._-]/g,'_').slice(-120)||'file',rid=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(16).slice(2)),path=uid+'/'+x.id+'/'+rid+'-'+safe,url=U+'/storage/v1/object/dela-private/'+path,r=await fetch(url,{method:'POST',headers:{apikey:K,Authorization:'Bearer '+s.access_token,'Content-Type':F.type||'application/octet-stream','x-upsert':'false'},body:F}),txt=await r.text();if(!r.ok){let msg=txt;try{let j=JSON.parse(txt);msg=j.message||j.error||j.msg||txt}catch{}throw Error('Файл не загрузился ('+r.status+'): '+msg)}let a;try{a=await ins('dela_attachments',{task_id:x.id,storage_path:path,file_name:F.name||safe,mime_type:F.type||'application/octet-stream',size_bytes:F.size||0})}catch(e){throw Error('Файл загружен, но не привязался к задаче: '+e.message)}S.attachments.push(a);return a}function renderAtts(){'''
+          s,n=re.subn(r"async function upload\(F\)\{.*?\}function renderAtts\(\)\{",new_upload,s,count=1,flags=re.S)
+          assert n==1, 'upload function not patched'
+
+          new_handler=r'''$('#pickfile').onclick=()=>{let f=$('#filein');f.value='';f.click()};$('#filein').onchange=async e=>{let fs=[...e.target.files];if(!fs.length)return;let m=$('#uploadmsg');m.textContent='Загружаю…';let ok=0;for(let F of fs){try{await upload(F);ok++}catch(err){m.textContent=err.message;alert(err.message);break}}e.target.value='';if(ok){m.textContent='Прикреплено: '+ok;await load();if(eid)renderAtts()}};window.addEventListener('online' '''
+          s,n=re.subn(r"\$\('#filein'\)\.onchange=async e=>\{.*?\};window\.addEventListener\('online'",new_handler,s,count=1,flags=re.S)
+          assert n==1, 'file change handler not patched'
+
+          assert 'id="pickfile"' in s
+          assert 'Файл не загрузился (' in s
+          assert 'function userId()' in s
+          p.write_text(s,encoding='utf-8')
+
+          m=re.search(r'<script>(.*)</script>',s,re.S)
+          assert m, 'inline script not found'
+          Path('/tmp/dela-app.js').write_text(m.group(1),encoding='utf-8')
+          subprocess.run(['node','--check','/tmp/dela-app.js'],check=True)
+          print('PATCH_VALIDATE=PASS')
+          PY
+      - name: Commit fix
+        shell: bash
+        run: |
+          set -e
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add dela/index.html
+          git diff --cached --check
+          git commit -m 'Fix iPhone file attachments'
+          git push origin HEAD:main
