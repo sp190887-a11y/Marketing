@@ -28,6 +28,14 @@ jobs:
             fi
             sleep 5
           done
+          python3 - <<'PY'
+          import re
+          h=open('/tmp/dela-index.html',encoding='utf-8').read()
+          m=re.search(r'<script>(.*)</script>',h,re.S)
+          assert m, 'inline script missing'
+          open('/tmp/dela-app.js','w',encoding='utf-8').write(m.group(1))
+          PY
+          node --check /tmp/dela-app.js
           curl -fsSL --max-time 20 "$base/manifest.webmanifest" -o /tmp/manifest.json
           python3 - <<'PY'
           import json
