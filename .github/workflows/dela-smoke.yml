@@ -1,4 +1,4 @@
-name: Dela live smoke
+name: Dela local live smoke
 
 on:
   workflow_dispatch:
@@ -11,19 +11,25 @@ jobs:
   live-smoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Wait for GitHub Pages and verify live app
+      - name: Wait for Pages and verify local app
         shell: bash
         run: |
           set -euo pipefail
           base='https://sp190887-a11y.github.io/Marketing/dela'
-          for i in $(seq 1 18); do
+          for i in $(seq 1 24); do
             if curl -fsSL --max-time 20 "$base/" -o /tmp/dela-index.html; then
-              if grep -q '<title>Дела</title>' /tmp/dela-index.html && grep -q 'id="auth"' /tmp/dela-index.html && grep -q 'ungkyimakkejsdsgkglz.supabase.co' /tmp/dela-index.html && grep -q 'id="pickfile"' /tmp/dela-index.html && grep -q 'Файл не загрузился (' /tmp/dela-index.html; then
+              if grep -q '<title>Дела</title>' /tmp/dela-index.html \
+                && grep -q 'indexedDB.open' /tmp/dela-index.html \
+                && grep -q '>Сохранить<' /tmp/dela-index.html \
+                && grep -q 'id="completeMenu"' /tmp/dela-index.html \
+                && grep -q 'id="deleteMenu"' /tmp/dela-index.html \
+                && grep -q 'restoreauto' /tmp/dela-index.html \
+                && ! grep -q 'supabase.co' /tmp/dela-index.html; then
                 break
               fi
             fi
-            if [ "$i" = 18 ]; then
-              echo 'Live Dela index did not become valid in time' >&2
+            if [ "$i" = 24 ]; then
+              echo 'Local Dela did not become live in time' >&2
               exit 1
             fi
             sleep 5
@@ -46,7 +52,7 @@ jobs:
           assert {'192x192','512x512'} <= sizes
           PY
           curl -fsSL --max-time 20 "$base/sw.js" -o /tmp/sw.js
-          grep -q "const C='dela-v2'" /tmp/sw.js
+          grep -q "const C='dela-local-v3'" /tmp/sw.js
           curl -fsSI --max-time 20 "$base/icon-192.png" | grep -qi '^content-type: image/png'
           curl -fsSI --max-time 20 "$base/icon-512.png" | grep -qi '^content-type: image/png'
-          echo 'LIVE_DELA_SMOKE=PASS'
+          echo 'LIVE_DELA_LOCAL_SMOKE=PASS'
