@@ -1,0 +1,32 @@
+name: AMP Function selftest v5
+
+on:
+  push:
+    paths:
+      - .github/workflows/amp-function-selftest-v5.yml
+  workflow_dispatch:
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Run live AMP selftest
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://br-purple-brook-b1pv77p6-ampmarketing.compute.c-5.eu-central-1.aws.neon.tech/api/selftest'
+          curl -fsS --retry 5 --retry-delay 2 "$URL" -o /tmp/selftest.json
+          python3 - <<'PY'
+          import json
+          j=json.load(open('/tmp/selftest.json'))
+          assert j.get('ok') is True,j
+          assert j.get('units')==3,j
+          assert j.get('sources')==268,j
+          assert j.get('library')==18,j
+          assert j.get('html_ok') is True,j
+          assert j.get('file') is True,j
+          assert int(j.get('save2'))==int(j.get('save1'))+1,j
+          assert int(j.get('reread_revision'))==int(j.get('save2')),j
+          print('AMP SELFTEST PASS',j)
+          PY
