@@ -1,0 +1,36 @@
+name: AMP Function final smoke
+on:
+  push:
+    paths:
+      - .github/workflows/amp-function-final-smoke.yml
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping final Function
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 --retry-delay 2 'https://br-purple-brook-b1pv77p6-ampmarketing.compute.c-5.eu-central-1.aws.neon.tech/api/ping' -o /tmp/ping.json
+          python3 - <<'PY'
+          import json
+          j=json.load(open('/tmp/ping.json'))
+          assert j.get('ok') is True, j
+          print('PING PASS',j)
+          PY
+      - name: Check login page
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 --retry-delay 2 'https://br-purple-brook-b1pv77p6-ampmarketing.compute.c-5.eu-central-1.aws.neon.tech/' -o /tmp/login.html
+          grep -q 'AMP Marketing WEB' /tmp/login.html
+          grep -q 'Пароль' /tmp/login.html
+          echo 'LOGIN PAGE PASS'
+      - name: Confirm selftest removed
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /tmp/st.json -w '%{http_code}' 'https://br-purple-brook-b1pv77p6-ampmarketing.compute.c-5.eu-central-1.aws.neon.tech/api/selftest')
+          test "$code" = '401' -o "$code" = '404'
+          echo 'SELFTEST REMOVED PASS' "$code"
