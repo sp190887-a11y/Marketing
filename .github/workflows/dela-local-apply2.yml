@@ -1,0 +1,50 @@
+name: Apply Dela local build v2
+
+on:
+  push:
+    paths:
+      - '.github/workflows/dela-local-apply2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Assemble and validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .dela-build/index.01 .dela-build/index.02 .dela-build/index.03 .dela-build/index.04 | base64 -d | gzip -d > dela/index.html
+          base64 -d .dela-build/sw.b64 | gzip -d > dela/sw.js
+          base64 -d .dela-build/smoke.b64 | gzip -d > .github/workflows/dela-smoke.yml
+          grep -q 'indexedDB.open' dela/index.html
+          grep -q '>Сохранить<' dela/index.html
+          grep -q 'id="completeMenu"' dela/index.html
+          grep -q 'id="deleteMenu"' dela/index.html
+          grep -q 'restoreauto' dela/index.html
+          ! grep -q 'supabase.co' dela/index.html
+          python3 - <<'PY'
+          import re, pathlib, subprocess
+          s=pathlib.Path('dela/index.html').read_text(encoding='utf-8')
+          m=re.search(r'<script>(.*)</script>',s,re.S)
+          assert m
+          pathlib.Path('/tmp/dela.js').write_text(m.group(1),encoding='utf-8')
+          subprocess.run(['node','--check','/tmp/dela.js'],check=True)
+          print('LOCAL_BUILD_VALIDATE=PASS')
+          PY
+      - name: Commit local Dela
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rm -rf .dela-build .github/workflows/dela-local-apply2.yml
+          git add -A dela/index.html dela/sw.js .github/workflows/dela-smoke.yml .dela-build .github/workflows/dela-local-apply2.yml
+          git diff --cached --check
+          git commit -m 'Switch Dela to local-first iPhone storage'
+          git push origin HEAD:main
