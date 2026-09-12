@@ -1,0 +1,29 @@
+name: AMP Function external smoke
+
+on:
+  push:
+    paths:
+      - .github/workflows/amp-function-smoke-20260912.yml
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call live AMP Function selftest
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://br-purple-brook-b1pv77p6-ampmarketing.compute.c-5.eu-central-1.aws.neon.tech/api/selftest?token=amp-smoke'
+          curl -fsS --retry 3 --retry-delay 2 "$URL" -o /tmp/amp-selftest.json
+          python3 - <<'PY'
+          import json
+          j=json.load(open('/tmp/amp-selftest.json'))
+          assert j.get('ok') is True, j
+          assert int(j['save2']) == int(j['save1']) + 1, j
+          assert j.get('units') == 3, j
+          assert j.get('sources') == 268, j
+          assert j.get('library') == 18, j
+          print('AMP_EXTERNAL_SELFTEST_PASS', json.dumps(j, ensure_ascii=False))
+          PY
