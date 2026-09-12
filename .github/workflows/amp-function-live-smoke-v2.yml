@@ -1,0 +1,44 @@
+name: AMP Function live smoke v2
+
+on:
+  push:
+    paths:
+      - .github/workflows/amp-function-live-smoke-v2.yml
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping live Neon Function
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://br-purple-brook-b1pv77p6-ampmarketing.compute.c-5.eu-central-1.aws.neon.tech'
+          curl -fsS --retry 5 --retry-delay 2 "$BASE/api/ping" -o /tmp/ping.json
+          python3 - <<'PY'
+          import json
+          j=json.load(open('/tmp/ping.json'))
+          assert j.get('ok') is True, j
+          assert j.get('gateway') == 'Neon Function direct SQL', j
+          print('PING PASS', j)
+          PY
+      - name: Check login page externally
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://br-purple-brook-b1pv77p6-ampmarketing.compute.c-5.eu-central-1.aws.neon.tech'
+          curl -fsS --retry 5 --retry-delay 2 "$BASE/" -o /tmp/root.html
+          grep -q 'AMP Marketing WEB' /tmp/root.html
+          grep -q 'Neon Function' /tmp/root.html
+          echo 'LOGIN PAGE PASS'
+      - name: Reject wrong password
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://br-purple-brook-b1pv77p6-ampmarketing.compute.c-5.eu-central-1.aws.neon.tech'
+          CODE=$(curl -sS -o /tmp/wrong.json -w '%{http_code}' -X POST "$BASE/api/login" -H 'content-type: application/json' --data '{"password":"__definitely_wrong__"}')
+          test "$CODE" = '401'
+          grep -q 'Неверный пароль' /tmp/wrong.json
+          echo 'WRONG PASSWORD REJECT PASS'
