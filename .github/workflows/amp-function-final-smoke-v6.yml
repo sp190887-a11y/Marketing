@@ -1,0 +1,36 @@
+name: AMP Function final smoke v6
+
+on:
+  push:
+    paths:
+      - .github/workflows/amp-function-final-smoke-v6.yml
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify clean production externally
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://br-purple-brook-b1pv77p6-ampmarketing.compute.c-5.eu-central-1.aws.neon.tech'
+          curl -fsS --retry 5 --retry-delay 2 "$BASE/api/ping" -o /tmp/ping.json
+          python3 - <<'PY'
+          import json
+          j=json.load(open('/tmp/ping.json'))
+          assert j.get('ok') is True,j
+          assert j.get('gateway')=='Neon Function direct SQL',j
+          print('PING PASS',j)
+          PY
+          curl -fsS --retry 5 --retry-delay 2 "$BASE/" -o /tmp/root.html
+          grep -q 'AMP Marketing WEB' /tmp/root.html
+          grep -q 'Neon Function' /tmp/root.html
+          echo 'LOGIN PAGE PASS'
+          CODE=$(curl -sS -o /tmp/wrong.json -w '%{http_code}' -X POST "$BASE/api/login" -H 'content-type: application/json' --data '{"password":"__wrong__"}')
+          test "$CODE" = '401'
+          echo 'WRONG PASSWORD REJECT PASS'
+          CODE=$(curl -sS -o /tmp/selftest.json -w '%{http_code}' "$BASE/api/selftest")
+          test "$CODE" = '401'
+          echo 'SELFTEST CLOSED PASS'
