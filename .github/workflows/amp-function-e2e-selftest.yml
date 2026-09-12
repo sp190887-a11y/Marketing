@@ -1,0 +1,27 @@
+name: AMP Function E2E selftest
+on:
+  push:
+    paths:
+      - .github/workflows/amp-function-e2e-selftest.yml
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Run live selftest
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 --retry-delay 2 'https://br-purple-brook-b1pv77p6-ampmarketing.compute.c-5.eu-central-1.aws.neon.tech/api/selftest' -o /tmp/e2e.json
+          cat /tmp/e2e.json
+          python3 - <<'PY'
+          import json
+          j=json.load(open('/tmp/e2e.json'))
+          assert j.get('ok') is True, j
+          assert j.get('units') == 3, j
+          assert j.get('sources') == 268, j
+          assert j.get('library') == 18, j
+          assert j.get('file_ok') is True, j
+          assert int(j.get('save2',0)) == int(j.get('save1',0))+1, j
+          print('AMP_E2E_PASS',j)
+          PY
