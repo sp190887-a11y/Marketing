@@ -1,0 +1,45 @@
+name: AMP Marketing V12.2 transport diagnostics
+
+on:
+  push:
+    paths:
+      - .github/workflows/v122-transport-diagnostics.yml
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Install browser driver
+        run: npm install --no-save puppeteer-core@24.16.0
+      - name: Check browser transport to Neon
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > ./v122-transport.mjs <<'JS'
+          import puppeteer from 'puppeteer-core';
+          import {execSync} from 'node:child_process';
+          const URL='https://sp190887-a11y.github.io/Marketing/amp-web/v122-test/';
+          const chrome=execSync("command -v google-chrome || command -v chromium || command -v chromium-browser",{encoding:'utf8'}).trim();
+          const browser=await puppeteer.launch({headless:true,executablePath:chrome,args:['--no-sandbox','--disable-dev-shm-usage']});
+          const page=await browser.newPage();
+          const errors=[];
+          page.on('console',m=>console.log('CONSOLE',m.type(),m.text()));
+          page.on('requestfailed',r=>console.log('FAILED',r.url(),r.failure()?.errorText||''));
+          await page.goto(URL,{waitUntil:'networkidle2',timeout:60000});
+          const result=await page.evaluate(async()=>{
+            const html=document.documentElement.outerHTML;
+            const api=(html.match(/const API="([^"]+)"/)||[])[1];
+            const auth=(html.match(/AUTH="([^"]+)"/)||[])[1];
+            if(!api||!auth)return {ok:false,error:'transport constants not found'};
+            try{
+              const r=await fetch(api+'/rpc/ping',{method:'POST',headers:{Authorization:'Bearer '+auth,'Content-Type':'application/json','Accept-Profile':'amp_api','Content-Profile':'amp_api'},body:'{}'});
+              return {ok:r.ok,status:r.status,text:await r.text(),acao:r.headers.get('access-control-allow-origin')};
+            }catch(e){return {ok:false,error:String(e)};}
+          });
+          console.log('PING RESULT',JSON.stringify(result));
+          await browser.close();
+          if(!result.ok)process.exit(2);
+          JS
+          node ./v122-transport.mjs
