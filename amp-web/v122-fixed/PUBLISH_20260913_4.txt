@@ -1,0 +1,1 @@
+Force GitHub Pages deployment from current V12.2 bridge head.
