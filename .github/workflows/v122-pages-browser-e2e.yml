@@ -1,0 +1,87 @@
+name: AMP Marketing V12.2 browser E2E
+
+on:
+  push:
+    paths:
+      - .github/workflows/v122-pages-browser-e2e.yml
+  workflow_dispatch:
+
+jobs:
+  browser-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Wait for Pages V12.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://sp190887-a11y.github.io/Marketing/amp-web/v122-test/'
+          for i in $(seq 1 30); do
+            if curl -fsSL "$URL" | grep -q 'V12.2 · TEST'; then echo 'PAGES READY'; exit 0; fi
+            sleep 2
+          done
+          echo 'Pages V12.2 not ready' >&2
+          exit 1
+      - name: Install browser driver
+        shell: bash
+        run: npm install --no-save puppeteer-core@24.16.0
+      - name: Run real Chrome E2E
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/v122-e2e.mjs <<'JS'
+          import puppeteer from 'puppeteer-core';
+          import {execSync} from 'node:child_process';
+          const URL='https://sp190887-a11y.github.io/Marketing/amp-web/v122-test/';
+          const chrome=execSync("command -v google-chrome || command -v chromium || command -v chromium-browser",{encoding:'utf8'}).trim();
+          const browser=await puppeteer.launch({headless:true,executablePath:chrome,args:['--no-sandbox','--disable-dev-shm-usage']});
+          const page=await browser.newPage();
+          const errs=[];
+          page.on('pageerror',e=>errs.push('PAGE: '+e.message));
+          page.on('console',m=>{if(['error'].includes(m.type())) errs.push('CONSOLE: '+m.text())});
+          const check=(name,ok,detail='')=>{console.log(`${ok?'PASS':'FAIL'} ${name}`,detail);if(!ok)throw new Error(name+': '+detail)};
+          await page.goto(URL,{waitUntil:'networkidle2',timeout:60000});
+          check('login page', (await page.content()).includes('V12.2 · TEST'));
+          await page.type('#pwd','AMPV122TEST');
+          await page.click('#go');
+          await page.waitForFunction(()=>document.querySelectorAll('#tabs .tab').length===8,{timeout:60000});
+          const labels=await page.$$eval('#tabs .tab',els=>els.map(e=>e.textContent.trim().replace(/^\S+\s*/,'')));
+          check('8 tabs',labels.length===8,JSON.stringify(labels));
+          for(const label of ['Задачи','Отзывы','Площадки','Каналы','Посты','Товары','Календарь','Библиотека']){
+            await page.evaluate(l=>{const b=[...document.querySelectorAll('#tabs .tab')].find(x=>x.textContent.includes(l));if(!b)throw new Error('tab '+l);b.click()},label);
+            await new Promise(r=>setTimeout(r,80));
+            check('tab '+label,await page.$eval('#content',e=>e.textContent.trim().length>0));
+          }
+          const version=await page.evaluate(()=>eval('state.app_version'));
+          check('version',version==='1.0.12.2-v12.2',version);
+          const r0=await page.evaluate(()=>Number(eval('state.cloud.revision')));
+          await page.evaluate(async()=>{await eval('manualSave(false)')});
+          const r1=await page.evaluate(()=>Number(eval('state.cloud.revision')));
+          await page.evaluate(async()=>{await eval('manualSave(false)')});
+          const r2=await page.evaluate(()=>Number(eval('state.cloud.revision')));
+          check('save 1',r1===r0+1,`${r0}->${r1}`);
+          check('save 2',r2===r1+1,`${r1}->${r2}`);
+          const file=await page.evaluate(async()=>{
+            const payload='hello-v122-external-'+Date.now();
+            const r=await fetch('/api/upload',{method:'POST',headers:{'Content-Type':'text/plain','X-Filename':encodeURIComponent('v122-browser.txt')},body:payload});
+            const j=await r.json();
+            if(!r.ok||!j.ok) return {ok:false,j};
+            const id=j.attachment?.id;
+            const g=await fetch('/api/file?id='+encodeURIComponent(id));
+            const txt=await g.text();
+            return {ok:g.ok&&txt===payload,id,txt};
+          });
+          check('attachment roundtrip',file.ok,JSON.stringify(file));
+          const conflict=await page.evaluate(async()=>{
+            const g=await fetch('/api/state');const st=await g.json();
+            st.cloud.revision=Number(st.cloud.revision)-1;
+            const r=await fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(st)});
+            return await r.json();
+          });
+          check('stale conflict',conflict?.ok===false&&conflict?.conflict===true,JSON.stringify(conflict));
+          await new Promise(r=>setTimeout(r,500));
+          check('no page errors',errs.length===0,errs.join('\n'));
+          console.log('BROWSER E2E PASS');
+          await browser.close();
+          JS
+          node /tmp/v122-e2e.mjs
