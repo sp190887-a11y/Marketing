@@ -11,26 +11,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check Vercel login page
+      - name: Inspect Vercel deployment
         shell: bash
         run: |
           set -euo pipefail
           BASE='https://amp-marketing-v122-test-5vwfxmeym-67unicorndine-4818.vercel.app'
-          curl -fLsS --retry 8 --retry-delay 2 "$BASE/" -o /tmp/root.html
+          code=$(curl -LsS -D /tmp/root.headers -o /tmp/root.html -w '%{http_code}' "$BASE/")
+          echo "ROOT HTTP=$code"
+          cat /tmp/root.headers
+          echo '--- ROOT BODY ---'
+          head -c 1200 /tmp/root.html; echo
+          ecode=$(curl -LsS -D /tmp/e2e.headers -o /tmp/e2e.body -w '%{http_code}' "$BASE/api/e2e")
+          echo "E2E HTTP=$ecode"
+          cat /tmp/e2e.headers
+          echo '--- E2E BODY ---'
+          head -c 4000 /tmp/e2e.body; echo
+          test "$code" = '200'
           grep -q 'AMP Marketing' /tmp/root.html
           grep -q 'V12.2' /tmp/root.html
           grep -q 'TEST' /tmp/root.html
-          echo 'VERCEL ROOT PASS'
-      - name: Run server-side network E2E
-        shell: bash
-        run: |
-          set -euo pipefail
-          BASE='https://amp-marketing-v122-test-5vwfxmeym-67unicorndine-4818.vercel.app'
-          curl -fLsS --retry 5 --retry-delay 2 "$BASE/api/e2e" -o /tmp/e2e.json
-          cat /tmp/e2e.json
+          test "$ecode" = '200'
           python3 - <<'PY'
           import json
-          j=json.load(open('/tmp/e2e.json'))
+          j=json.load(open('/tmp/e2e.body'))
           assert j.get('ok') is True, j
           checks={x['name']:x for x in j.get('checks',[])}
           required=['health','state_get','save_1','save_2','conflict','file_put','file_get','public_schema_blocked']
