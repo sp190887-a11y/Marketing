@@ -1,0 +1,43 @@
+name: AMP Marketing V12.2 asset HTTP diagnostics
+
+on:
+  push:
+    paths:
+      - .github/workflows/v122-asset-http-diagnostics.yml
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check asset RPC
+        shell: bash
+        run: |
+          set -euo pipefail
+          PAGE='https://sp190887-a11y.github.io/Marketing/amp-web/v122-test/'
+          curl -fsSL "$PAGE" -o /tmp/v122.html
+          python3 - <<'PY' > /tmp/env.sh
+          import re,shlex
+          s=open('/tmp/v122.html',encoding='utf-8').read()
+          api=re.search(r'const API="([^"]+)"',s).group(1)
+          auth=re.search(r'AUTH="([^"]+)"',s).group(1)
+          print('API='+shlex.quote(api))
+          print('AUTH='+shlex.quote(auth))
+          PY
+          source /tmp/env.sh
+          code=$(curl -sS -o /tmp/asset.json -w '%{http_code}' -X POST "$API/rpc/asset_auth" \
+            -H "Authorization: Bearer $AUTH" \
+            -H 'Content-Type: application/json' \
+            -H 'Accept-Profile: amp_api' \
+            -H 'Content-Profile: amp_api' \
+            --data '{"p_key":"AMPV122TEST","p_name":"index.html.gz"}')
+          echo "HTTP=$code"
+          python3 - <<'PY'
+          import json,sys
+          j=json.load(open('/tmp/asset.json'))
+          print('ok=',j.get('ok'),'name=',j.get('name'),'b64_chars=',len(j.get('b64','')),'error=',j.get('message') or j.get('error'))
+          assert j.get('ok') is True
+          assert len(j.get('b64',''))>60000
+          PY
+          test "$code" = '200'
