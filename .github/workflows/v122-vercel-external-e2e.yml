@@ -1,0 +1,40 @@
+name: AMP Marketing V12.2 Vercel external E2E
+
+on:
+  push:
+    paths:
+      - .github/workflows/v122-vercel-external-e2e.yml
+  workflow_dispatch:
+
+jobs:
+  external-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check Vercel login page
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://amp-marketing-v122-test-5vwfxmeym-67unicorndine-4818.vercel.app'
+          curl -fLsS --retry 8 --retry-delay 2 "$BASE/" -o /tmp/root.html
+          grep -q 'AMP Marketing' /tmp/root.html
+          grep -q 'V12.2' /tmp/root.html
+          grep -q 'TEST' /tmp/root.html
+          echo 'VERCEL ROOT PASS'
+      - name: Run server-side network E2E
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://amp-marketing-v122-test-5vwfxmeym-67unicorndine-4818.vercel.app'
+          curl -fLsS --retry 5 --retry-delay 2 "$BASE/api/e2e" -o /tmp/e2e.json
+          cat /tmp/e2e.json
+          python3 - <<'PY'
+          import json
+          j=json.load(open('/tmp/e2e.json'))
+          assert j.get('ok') is True, j
+          checks={x['name']:x for x in j.get('checks',[])}
+          required=['health','state_get','save_1','save_2','conflict','file_put','file_get','public_schema_blocked']
+          missing=[x for x in required if not checks.get(x,{}).get('ok')]
+          assert not missing, (missing,j)
+          print('NETWORK E2E PASS', required)
+          PY
