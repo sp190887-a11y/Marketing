@@ -1,0 +1,50 @@
+name: Build AMP Marketing V12.2 fixed loader
+
+on:
+  push:
+    paths:
+      - .github/workflows/build-v122-fixed-loader.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build fixed loader from existing loader
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          src=Path('amp-web/v122-test/index.html').read_text(encoding='utf-8')
+          new_patch=r'''function patchV122(app){const END='</scr'+'ipt>';const helpers=`const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)]; const deep=x=>structuredClone(x); const nowIso=()=>new Date().toISOString(); const today=()=>new Date().toISOString().slice(0,10); const uid=p=>p+'_'+crypto.getRandomValues(new Uint32Array(2)).join('');\n`;if(!app.includes('const $=s=>document.querySelector(s)'))app=app.replace('const TABS=',helpers+'const TABS=');app=app.replace('\ninit();\n','\n').replace('\nnormalizeV11();render();\n','\n').replace('\nnormalizeV12();render();\n','\n');app=app.replace('state=j}normalize();currentUnitId=',"state=j}normalize();if(typeof normalizeV11==='function')normalizeV11();if(typeof normalizeV12==='function')normalizeV12();currentUnitId=");app=app.replace("if(!r.ok||!j.ok)throw new Error(j.error||'Ошибка');dirty=false;","if(!r.ok||!j.ok)throw new Error(j.error||'Ошибка');if(j.revision){state.cloud=state.cloud||{};state.cloud.revision=Number(j.revision)}dirty=false;");app=app.replace("state.app_version='1.0.12-v12';","state.app_version='1.0.12.2-v12.2';");app=app.replace("if(a.url){window.open(a.url,'_blank','noopener');return;}","if(a.url){const rr=await fetch('/api/open-attachment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({relative_path:a.relative_path||a.id||String(a.url).split('id=').pop()})});const jj=await rr.json();if(!rr.ok||!jj.ok)throw new Error(jj.error||'Не удалось открыть файл');return;}");app=app.replace(/<head([^>]*)>/i,'<head$1><script src=\"./bridge-v122.js\">'+END);app=app.replace('</body></html>','<script>init();'+END+'</body></html>');return app}'''
+          fixed,n=re.subn(r'function patchV122\(app\)\{[\s\S]*?\}\nasync function start\(\)',new_patch+'\nasync function start()',src,count=1)
+          assert n==1, 'patchV122 block not found'
+          fixed=fixed.replace('V12.2 · TEST · общая база Neon','V12.2 · TEST FIXED · Neon')
+          # Inside the loader JS, only the actual final HTML closing script tag may remain literal.
+          assert fixed.lower().count('</script>')==1, fixed.lower().count('</script>')
+          out=Path('amp-web/v122-fixed/index.html');out.parent.mkdir(parents=True,exist_ok=True);out.write_text(fixed,encoding='utf-8')
+          print('WROTE',out,len(fixed.encode()))
+          PY
+          python3 - <<'PY'
+          import subprocess
+          s=open('amp-web/v122-fixed/index.html',encoding='utf-8').read()
+          a=s.index('<script>\n(()=>{')+8
+          b=s.rfind('</script>')
+          open('/tmp/loader.js','w',encoding='utf-8').write(s[a:b])
+          r=subprocess.run(['node','--check','/tmp/loader.js'])
+          raise SystemExit(r.returncode)
+          PY
+      - name: Commit fixed loader
+        shell: bash
+        run: |
+          git config user.name 'AMP V12.2 Builder'
+          git config user.email 'actions@users.noreply.github.com'
+          git add amp-web/v122-fixed/index.html amp-web/v122-fixed/bridge-v122.js
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix: publish AMP Marketing V12.2 fixed loader'
+          git push
