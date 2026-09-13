@@ -15,9 +15,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          URL='https://sp190887-a11y.github.io/Marketing/amp-web/v122-test/'
+          URL='https://sp190887-a11y.github.io/Marketing/amp-web/v122-fixed/'
           for i in $(seq 1 30); do
-            if curl -fsSL "$URL" | grep -q 'V12.2 · TEST'; then echo 'PAGES READY'; exit 0; fi
+            if curl -fsSL "$URL" | grep -q 'V12.2'; then echo 'PAGES READY'; exit 0; fi
             sleep 2
           done
           echo 'Pages V12.2 not ready' >&2
@@ -32,7 +32,7 @@ jobs:
           cat > ./v122-e2e.mjs <<'JS'
           import puppeteer from 'puppeteer-core';
           import {execSync} from 'node:child_process';
-          const URL='https://sp190887-a11y.github.io/Marketing/amp-web/v122-test/';
+          const URL='https://sp190887-a11y.github.io/Marketing/amp-web/v122-fixed/';
           const chrome=execSync("command -v google-chrome || command -v chromium || command -v chromium-browser",{encoding:'utf8'}).trim();
           const browser=await puppeteer.launch({headless:true,executablePath:chrome,args:['--no-sandbox','--disable-dev-shm-usage']});
           const page=await browser.newPage();
@@ -41,10 +41,10 @@ jobs:
           page.on('console',m=>{if(m.type()==='error') errs.push('CONSOLE: '+m.text())});
           const check=(name,ok,detail='')=>{console.log(`${ok?'PASS':'FAIL'} ${name}`,detail);if(!ok)throw new Error(name+': '+detail)};
           await page.goto(URL,{waitUntil:'networkidle2',timeout:60000});
-          check('login page', (await page.content()).includes('V12.2 · TEST'));
-          await page.type('#pwd','AMPV122TEST');
+          check('login page', (await page.content()).includes('V12.2'));
+          await page.type('#pwd','AMP122');
           await page.click('#go');
-          await page.waitForFunction(()=>document.querySelectorAll('#tabs .tab').length===8,{timeout:60000});
+          try{await page.waitForFunction(()=>document.querySelectorAll('#tabs .tab').length===8,{timeout:60000})}catch(e){console.log('BODY',await page.evaluate(()=>document.body.innerText.slice(0,2000)));console.log('ERRORS',errs.join('\n'));throw e}
           const labels=await page.$$eval('#tabs .tab',els=>els.map(e=>e.textContent.trim()));
           check('8 tabs',labels.length===8,JSON.stringify(labels));
           for(const label of ['Задачи','Отзывы','Площадки','Каналы','Посты','Товары','Календарь','Библиотека']){
