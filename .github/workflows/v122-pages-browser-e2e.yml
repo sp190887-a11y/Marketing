@@ -29,7 +29,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat > /tmp/v122-e2e.mjs <<'JS'
+          cat > ./v122-e2e.mjs <<'JS'
           import puppeteer from 'puppeteer-core';
           import {execSync} from 'node:child_process';
           const URL='https://sp190887-a11y.github.io/Marketing/amp-web/v122-test/';
@@ -38,14 +38,14 @@ jobs:
           const page=await browser.newPage();
           const errs=[];
           page.on('pageerror',e=>errs.push('PAGE: '+e.message));
-          page.on('console',m=>{if(['error'].includes(m.type())) errs.push('CONSOLE: '+m.text())});
+          page.on('console',m=>{if(m.type()==='error') errs.push('CONSOLE: '+m.text())});
           const check=(name,ok,detail='')=>{console.log(`${ok?'PASS':'FAIL'} ${name}`,detail);if(!ok)throw new Error(name+': '+detail)};
           await page.goto(URL,{waitUntil:'networkidle2',timeout:60000});
           check('login page', (await page.content()).includes('V12.2 · TEST'));
           await page.type('#pwd','AMPV122TEST');
           await page.click('#go');
           await page.waitForFunction(()=>document.querySelectorAll('#tabs .tab').length===8,{timeout:60000});
-          const labels=await page.$$eval('#tabs .tab',els=>els.map(e=>e.textContent.trim().replace(/^\S+\s*/,'')));
+          const labels=await page.$$eval('#tabs .tab',els=>els.map(e=>e.textContent.trim()));
           check('8 tabs',labels.length===8,JSON.stringify(labels));
           for(const label of ['Задачи','Отзывы','Площадки','Каналы','Посты','Товары','Календарь','Библиотека']){
             await page.evaluate(l=>{const b=[...document.querySelectorAll('#tabs .tab')].find(x=>x.textContent.includes(l));if(!b)throw new Error('tab '+l);b.click()},label);
@@ -84,4 +84,4 @@ jobs:
           console.log('BROWSER E2E PASS');
           await browser.close();
           JS
-          node /tmp/v122-e2e.mjs
+          node ./v122-e2e.mjs
