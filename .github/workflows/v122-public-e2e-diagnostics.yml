@@ -1,0 +1,44 @@
+name: AMP Marketing V12.2 public E2E diagnostics
+
+on:
+  push:
+    paths:
+      - .github/workflows/v122-public-e2e-diagnostics.yml
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Install browser driver
+        run: npm install --no-save puppeteer-core@24.16.0
+      - name: Diagnose fixed loader
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > ./diag.mjs <<'JS'
+          import puppeteer from 'puppeteer-core';
+          import {execSync} from 'node:child_process';
+          const chrome=execSync("command -v google-chrome || command -v chromium || command -v chromium-browser",{encoding:'utf8'}).trim();
+          const browser=await puppeteer.launch({headless:true,executablePath:chrome,args:['--no-sandbox','--disable-dev-shm-usage']});
+          const page=await browser.newPage();
+          const logs=[];
+          page.on('console',m=>logs.push(`CONSOLE ${m.type()} ${m.text()}`));
+          page.on('pageerror',e=>logs.push(`PAGEERROR ${e.message}`));
+          page.on('requestfailed',r=>logs.push(`FAILED ${r.method()} ${r.url()} ${r.failure()?.errorText||''}`));
+          page.on('response',r=>{if(r.status()>=400)logs.push(`HTTP ${r.status()} ${r.request().method()} ${r.url()}`)});
+          await page.goto('https://sp190887-a11y.github.io/Marketing/amp-web/v122-test/',{waitUntil:'networkidle2',timeout:60000});
+          await page.type('#pwd','__E2E_PUBLIC_TEST__');
+          await page.click('#go');
+          await new Promise(r=>setTimeout(r,12000));
+          const status=await page.$eval('#st',e=>e.textContent).catch(()=>'(status node gone)');
+          const tabs=await page.$$eval('#tabs .tab',e=>e.length).catch(()=>0);
+          console.log('TITLE='+await page.title());
+          console.log('STATUS='+status);
+          console.log('TABS='+tabs);
+          console.log(logs.join('\n')||'NO_BROWSER_ERRORS');
+          await browser.close();
+          if(tabs!==8)process.exit(2);
+          JS
+          node ./diag.mjs
