@@ -17,7 +17,7 @@ jobs:
           set -euo pipefail
           URL='https://sp190887-a11y.github.io/Marketing/amp-web/v122-fixed/'
           for i in $(seq 1 30); do
-            if curl -fsSL "$URL" | grep -q 'V12.2'; then echo 'PAGES READY'; exit 0; fi
+            if curl -fsSL "$URL" -o /tmp/v122-page.html && grep -q 'V12.2' /tmp/v122-page.html; then echo 'PAGES READY'; exit 0; fi
             sleep 2
           done
           echo 'Pages V12.2 not ready' >&2
