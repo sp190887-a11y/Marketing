@@ -1,5 +1,7 @@
 (function(){
 'use strict';
+if(typeof globalThis.$!=='function')globalThis.$=(s,r=document)=>r.querySelector(s);
+if(typeof globalThis.$$!=='function')globalThis.$$=(s,r=document)=>Array.from(r.querySelectorAll(s));
 const NATIVE=window.fetch.bind(window);let CFG=null;
 async function cfg(){if(CFG)return CFG;const r=await NATIVE('../v122-test/',{cache:'no-store'}),s=await r.text();const api=(s.match(/const API="([^"]+)"/)||[])[1],auth=(s.match(/AUTH="([^"]+)"/)||[])[1];if(!api||!auth)throw new Error('Не найдена конфигурация Neon');return CFG={api,auth,profile:'amp_api'}}
 function key(){return sessionStorage.getItem('ampWebKey')||''}
