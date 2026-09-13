@@ -8,7 +8,7 @@ function key(){return sessionStorage.getItem('ampWebKey')||''}
 async function rpc(name,args={}){const c=await cfg(),r=await NATIVE(c.api+'/rpc/'+name,{method:'POST',headers:{Authorization:'Bearer '+c.auth,'Content-Type':'application/json','Accept-Profile':c.profile,'Content-Profile':c.profile},body:JSON.stringify(args)});const t=await r.text();let j;try{j=t?JSON.parse(t):null}catch{j=t}if(!r.ok){const e=new Error(j?.message||j?.error||String(j||('HTTP '+r.status)));e.status=r.status;throw e}return j}
 async function call(action,payload={}){const k=key();if(!k){const e=new Error('Требуется вход');e.status=401;throw e}return rpc('call',{p_key:k,p_action:action,p_payload:payload})}
 function jr(o,status=200){return new Response(JSON.stringify(o),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}})}
-function forceV122(){setTimeout(()=>{try{state.app_version='1.0.12.2-v12.2'}catch{}},0)}
+function forceV122(){let n=0;const t=setInterval(()=>{n++;try{state.app_version='1.0.12.2-v12.2'}catch{}if(n>=20)clearInterval(t)},50)}
 async function body(opt={}){if(opt.body==null)return{};if(typeof opt.body==='string')return JSON.parse(opt.body||'{}');if(opt.body instanceof Blob)return JSON.parse(await opt.body.text());return opt.body}
 function b64(u){let s='';for(let i=0;i<u.length;i+=32768)s+=String.fromCharCode(...u.subarray(i,i+32768));return btoa(s)}
 async function fileBlob(id){const x=await call('file_get',{id});if(!x?.ok)throw new Error(x?.error||'Файл не найден');const bin=atob(x.b64),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return{x,blob:new Blob([u],{type:x.mime||'application/octet-stream'})}}
