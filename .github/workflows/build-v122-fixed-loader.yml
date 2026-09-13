@@ -39,12 +39,17 @@ jobs:
           r=subprocess.run(['node','--check','/tmp/loader.js'])
           raise SystemExit(r.returncode)
           PY
+      - name: Publish fixed loader to test URL
+        shell: bash
+        run: |
+          cp amp-web/v122-fixed/index.html amp-web/v122-test/index.html
+          cp amp-web/v122-fixed/bridge-v122.js amp-web/v122-test/bridge-v122.js
       - name: Commit fixed loader
         shell: bash
         run: |
           git config user.name 'AMP V12.2 Builder'
           git config user.email 'actions@users.noreply.github.com'
-          git add amp-web/v122-fixed/index.html amp-web/v122-fixed/bridge-v122.js
+          git add amp-web/v122-fixed/index.html amp-web/v122-fixed/bridge-v122.js amp-web/v122-test/index.html amp-web/v122-test/bridge-v122.js
           git diff --cached --quiet && exit 0
-          git commit -m 'fix: publish AMP Marketing V12.2 fixed loader'
+          git commit -m 'test: serve fixed AMP Marketing V12.2 loader'
           git push
