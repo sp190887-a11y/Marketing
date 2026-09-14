@@ -30,11 +30,11 @@ const seed={
   {id:'r5',title:'Футболка',category:'Мерч',desc:'Фирменная футболка',price:3500,stock:6,limit:1,sort:5,fulfill:'В офисе',active:true,emoji:'👕',main:'',media:[],minDiscount:5,gender:'male',birthday:false,from:'',to:'',lockedVisible:true}
  ],
  promotions:[
-  {id:'p1',title:'Подписка VK',text:'Подпишитесь на основную группу',reward:'+100 АМ',kind:'Постоянные'},
-  {id:'p2',title:'Telegram',text:'Подписка на канал Амплитуды',reward:'+150 АМ',kind:'Постоянные'},
-  {id:'p3',title:'MAX',text:'Подписка на канал MAX',reward:'+200 АМ',kind:'Постоянные'},
-  {id:'p4',title:'День рождения',text:'Специальный бонус в день рождения',reward:'+300 АМ',kind:'События'},
-  {id:'p5',title:'Осенний бонус',text:'Дополнительные АМ за сезонные активности',reward:'+50 АМ',kind:'Сезонные'}
+  {id:'p1',title:'Подписка VK',text:'Подпишитесь на основную группу',kind:'Постоянные',rewardType:'fixed',amount:100,maxPerAccrual:100,limitPerClient:1,totalLimit:0,from:'',to:'',active:true,minDiscount:0,gender:'any',birthday:false,main:'',media:[]},
+  {id:'p2',title:'Telegram',text:'Подписка на канал Амплитуды',kind:'Постоянные',rewardType:'fixed',amount:150,maxPerAccrual:150,limitPerClient:1,totalLimit:0,from:'',to:'',active:true,minDiscount:0,gender:'any',birthday:false,main:'',media:[]},
+  {id:'p3',title:'MAX',text:'Подписка на канал MAX',kind:'Постоянные',rewardType:'fixed',amount:200,maxPerAccrual:200,limitPerClient:1,totalLimit:0,from:'',to:'',active:true,minDiscount:0,gender:'any',birthday:false,main:'',media:[]},
+  {id:'p4',title:'День рождения',text:'Специальный бонус в день рождения',kind:'События',rewardType:'fixed',amount:300,maxPerAccrual:300,limitPerClient:1,totalLimit:0,from:'',to:'',active:true,minDiscount:0,gender:'any',birthday:true,main:'',media:[]},
+  {id:'p5',title:'Осенний бонус',text:'Дополнительные АМ за сезонные активности',kind:'Сезонные',rewardType:'fixed',amount:50,maxPerAccrual:50,limitPerClient:3,totalLimit:0,from:'2026-09-01T00:00',to:'2026-11-30T23:59',active:true,minDiscount:0,gender:'any',birthday:false,main:'',media:[]}
  ],
  events:[{id:'e1',title:'День рождения',trigger:'birthday',action:'+300 АМ',active:true},{id:'e2',title:'Первый вход',trigger:'first_login',action:'Подарок: Стикеры',active:true}],
  gifts:[{id:'g1',title:'Сюрприз-мини',audience:'Все участники',status:'Активен'},{id:'g2',title:'Подарок имениннику',audience:'День рождения',status:'Активен'}],
