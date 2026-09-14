@@ -17,8 +17,15 @@ jobs:
           node --check amp-club-stage10-1/app-b.js
           node --check amp-club-stage10-1/app-c.js
           node --check amp-club-stage10-1/app-d.js
+          node --check amp-club-stage10-1/app-e.js
+          node --check amp-club-stage10-1/save-links.js
       - name: Check required Stage 10.1 features
         run: |
           grep -q "promotionEditor" amp-club-stage10-1/app-c.js
           grep -q "save-promo" amp-club-stage10-1/app-d.js
           grep -q "e.key!=='Enter'" amp-club-stage10-1/app-c.js
+          grep -q "amp-logo.svg" amp-club-stage10-1/app-e.js
+          grep -q "Гоголя, 2" amp-club-stage10-1/app-e.js
+          grep -q "2820580@mail.ru" amp-club-stage10-1/app-e.js
+          grep -q "promoLink" amp-club-stage10-1/save-links.js
+          grep -q "quickchart.io/qr" amp-club-stage10-1/save-links.js
