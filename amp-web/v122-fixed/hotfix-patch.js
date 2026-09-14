@@ -65,6 +65,7 @@ toggleReviewDone=function(pid,sid,on){
   if(on){const inp=$('#rd_'+CSS.escape(pid)+'_'+CSS.escape(sid));const date=(inp?.value||v.pending_done_date||today());v.status='done';v.done_at=date+'T12:00:00Z';delete v.pending_done_date;if(!was)logEvent('review_added',{person_id:pid,source_id:sid,date});reviewOpenV10.delete(sid);}
   else{v.status='requested';v.done_at='';if(!v.requested_at)v.requested_at=nowIso();reviewOpenV10.add(sid);}
   touch(p);render();
+  if(on)setTimeout(()=>reviewOpenV10.delete(sid),0);
 };
 
 taskCard=function(t){
@@ -90,9 +91,13 @@ renderSettings=function(section=''){
       if(l.textContent.trim()==='Пост просрочен, дней')l.textContent='Перерыв без поста, дней';
       if(l.textContent.trim()==='Товар просрочен, дней')l.textContent='Перерыв без обновления товара, дней';
     });
+  }  const dbSection=[...body.querySelectorAll('.settings-section')].find(x=>x.querySelector('h3')?.textContent.trim()==='База, архив и файлы');
+  if(dbSection&&!dbSection.querySelector('.serverMigrationV122')){
+    const a=dbSection.querySelector('.setting-actions');
+    if(a)a.insertAdjacentHTML('beforeend',`<button class="btn serverMigrationV122" onclick="exportServerMigrationV122()">Экспорт на наш сервер · база + файлы</button><button class="btn serverMigrationV122" onclick="pickServerMigrationV122()">Импорт WEB→сервер</button>`);
   }
 };
-async function saveWorkStartFromSettingsV122(){
+window.saveWorkStartFromSettingsV122=async function(){
   const v=$('#workStartSettingsDateV122')?.value||AMP_DEFAULT_START_DATE;
   state.work_start_date=v;markDirty();await manualSave(false);renderSettings();
 }
@@ -124,6 +129,43 @@ renderTasks=function(){
   if(q)arr=arr.filter(t=>hasQv11(taskSearchTextV11(t),q));
   arr=[...arr].sort((a,b)=>(b.fresh?1:0)-(a.fresh?1:0)||(a.status==='done')-(b.status==='done')||(a.due||'9999').localeCompare(b.due||'9999')||(b.created_at||'').localeCompare(a.created_at||''));
   $('#content').innerHTML=head('Задачи',actions)+filters+(arr.map(taskCard).join('')||'<div class="tile hint">Задач нет.</div>');
+};
+
+
+
+function bytesToB64V122(u){let out='';const step=32768;for(let i=0;i<u.length;i+=step)out+=String.fromCharCode(...u.subarray(i,Math.min(i+step,u.length)));return btoa(out)}
+function collectMigrationAttachmentsV122(root){const m=new Map();const walk=x=>{if(!x||typeof x!=='object')return;if(Array.isArray(x)){x.forEach(walk);return}if(Array.isArray(x.attachments))for(const a of x.attachments||[])if(a?.id&&!m.has(String(a.id)))m.set(String(a.id),a);for(const [k,v] of Object.entries(x))if(k!=='attachments')walk(v)};walk(root);return [...m.values()]}
+window.exportServerMigrationV122=async function(){
+  try{
+    const snap=deep(state);delete snap.cloud;
+    const refs=collectMigrationAttachmentsV122(snap),files=[];let total=0,missing=[];
+    setSave('dirty',`экспорт файлов 0/${refs.length}`);
+    for(let i=0;i<refs.length;i++){
+      const a=refs[i],url=a.url||(`/api/file?id=${encodeURIComponent(a.id)}`);
+      try{const r=await fetch(url);if(!r.ok)throw new Error('HTTP '+r.status);const u=new Uint8Array(await r.arrayBuffer());total+=u.length;files.push({id:String(a.id),name:a.name||String(a.id),mime:a.mime||r.headers.get('content-type')||'application/octet-stream',b64:bytesToB64V122(u)})}catch(e){missing.push(`${a.name||a.id}: ${e.message}`)}
+      setSave('dirty',`экспорт файлов ${i+1}/${refs.length}`);
+    }
+    if(missing.length&&!confirm(`Не удалось прочитать ${missing.length} вложений.\n\n${missing.slice(0,10).join('\n')}\n\nСделать пакет без них?`)){setSave('err','экспорт отменён');return}
+    const pkg={schema:'amp-marketing-server-migration-v1',created_at:nowIso(),state:snap,files,missing,total_bytes:total};
+    downloadBlob(new Blob([JSON.stringify(pkg)],{type:'application/json;charset=utf-8'}),`AMP_MARKETING_SERVER_MIGRATION_${today()}.ampserver.json`);
+    setSave('ok',`пакет готов · ${files.length} файлов`);
+  }catch(e){setSave('err','ошибка экспорта');alert(e.message)}
+}
+window.pickServerMigrationV122=function(){
+  const i=document.createElement('input');i.type='file';i.accept='.json,.ampserver';i.onchange=async()=>{const f=i.files?.[0];if(!f)return;try{if(!confirm('Импорт заменит текущую серверную базу и восстановит вложения из пакета. Продолжить?'))return;setSave('dirty','импорт на сервер…');const r=await fetch('/api/admin/import-migration',{method:'POST',headers:{'Content-Type':'application/json'},body:f}),j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||'Ошибка импорта');alert(`Импорт завершён. Файлов: ${j.files||0}.`);location.reload()}catch(e){setSave('err','ошибка импорта');alert(e.message)}};i.click();
+}
+
+// Full JSON import is also the migration path from Neon/test web to the own server.
+// Drop the foreign cloud revision so the server accepts the imported snapshot as a new local revision.
+importFullDatabase=async function(input){
+  const f=input.files?.[0];if(!f)return;
+  try{
+    const o=JSON.parse(await f.text());
+    if(o.schema!=='amp-marketing-lite-v1')throw new Error('Не база AMP Marketing');
+    if(!confirm('Полный импорт ЗАМЕНИТ текущую базу. Для обычного обмена используйте «Импорт изменений». Продолжить?'))return;
+    delete o.cloud;
+    state=o;normalize();currentUnitId=state.units[0].id;markDirty();await manualSave(false);settings.close();render();
+  }catch(e){alert(e.message)}finally{input.value=''}
 };
 
 
