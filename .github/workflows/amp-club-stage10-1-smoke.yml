@@ -1,0 +1,24 @@
+name: AM Club Stage 10.1 smoke
+
+on:
+  push:
+    paths:
+      - 'amp-club-stage10-1/**'
+      - '.github/workflows/amp-club-stage10-1-smoke.yml'
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check JavaScript syntax
+        run: |
+          node --check amp-club-stage10-1/app-a.js
+          node --check amp-club-stage10-1/app-b.js
+          node --check amp-club-stage10-1/app-c.js
+          node --check amp-club-stage10-1/app-d.js
+      - name: Check required Stage 10.1 features
+        run: |
+          grep -q "promotionEditor" amp-club-stage10-1/app-c.js
+          grep -q "save-promo" amp-club-stage10-1/app-d.js
+          grep -q "e.key!=='Enter'" amp-club-stage10-1/app-c.js
