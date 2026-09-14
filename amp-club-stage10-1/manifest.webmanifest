@@ -1,0 +1,13 @@
+{
+  "name": "АМ Клуб",
+  "short_name": "АМ Клуб",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f9fc",
+  "theme_color": "#0b8fe8",
+  "description": "АМ Клуб — программа лояльности Амплитуды",
+  "icons": [
+    {"src":"./amp-logo.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
