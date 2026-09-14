@@ -9,7 +9,7 @@ if(!state.work_start_date){state.work_start_date=AMP_DEFAULT_START_DATE;markDirt
 
 const SECTION_HELP_V122={
   tasks:{title:'Задачи',html:`<p><b>Для чего:</b> единый рабочий список. Сюда попадают ручные задачи, входящие и автоматические напоминания.</p><p><b>Как работать:</b> откройте карточку, уточните срок и описание, прикрепите файлы. После выполнения нажмите «Готово» — карточка перейдёт в «Готовые» и сразу свернётся.</p><p><b>Просрочка:</b> считается только начиная с установленной точки старта. Старые даты до неё не окрашиваются как просроченные.</p><p><b>Входящие:</b> материал можно превратить в задачу. Из задачи можно сделать пост или товар.</p>`},
-  reviews:{title:'Отзывы',html:`<p><b>Для чего:</b> видеть площадки отзывов, кого уже просили и кто реально оставил отзыв.</p><p><b>Как работать:</b> добавьте человека, выберите площадку, нажмите «Попросить». Когда отзыв появился — укажите фактическую дату и отметьте «Оставил».</p><p>После отметки «Оставил» раскрытая площадка сворачивается, чтобы список не растягивался. История по человеку и площадке сохраняется.</p><p>Вкладки «Демо-отзывы» и «Ответы» — библиотека заготовок, а не факт опубликованного отзыва.</p>`},
+  reviews:{title:'Отзывы',html:`<p><b>Для чего:</b> видеть площадки отзывов, кого уже просили и кто реально оставил отзыв.</p><p><b>Как работать:</b> добавьте человека, выберите площадку, нажмите «Попросить». Когда отзыв появился — укажите фактическую дату и отметьте «Оставил».</p><p>После отметки «Оставил» раскрытая площадка сворачивается, чтобы список не растягивался. История по человеку и площадке сохраняется.</p><p>Вкладка «Ответы на отзывы» — библиотека заготовок ответов компании. Она не меняет фактическую историю отзывов.</p>`},
   platforms:{title:'Площадки',html:`<p><b>Для чего:</b> учёт основных и дополнительных площадок компании.</p><p>Укажите название, категорию, ссылку, наличие и состояние. В блоке «Что сделать» ведите конкретные пункты работы; дата напоминания необязательна.</p><p>«Основные» требуют постоянной актуализации, «Дополнительные» могут быть разовыми. Неактуальное сначала отправляется в архив.</p>`},
   channels:{title:'Каналы',html:`<p><b>Для чего:</b> учёт каналов публикации и коммуникации.</p><p>Канал можно сделать активным/неактивным, отметить созданным или находящимся в процессе. Один источник может одновременно иметь несколько ролей.</p><p>В строках работы фиксируйте, что именно нужно настроить, проверить или обновить.</p>`},
   posts:{title:'Посты',html:`<p><b>Для чего:</b> хранить мастер-текст публикации и отмечать, куда он размещён.</p><p>Создайте пост, заполните дату, заголовок и полный текст, затем через «+» выберите площадки или целую свою папку площадок.</p><p>После публикации отмечайте результат по каждой площадке. При переводе самого поста в «Готово» карточка сразу сворачивается.</p>`},
@@ -45,11 +45,13 @@ setTaskDoneV11=function(id,status){
   touch(t);render();
 };
 
+const _changePostV122=changePost;
 changePost=function(id,k,v,rr=false){
   const p=getPost(id);if(!p)return;p[k]=v;touch(p);
   if(k==='status'&&v==='done')openSets.posts.delete(id);
   if(rr)render();
 };
+const _changeProductV122=changeProduct;
 changeProduct=function(id,k,v,rr=false){
   const p=getProduct(id);if(!p)return;p[k]=v;touch(p);
   if(k==='status'&&v==='done')openSets.products.delete(id);
@@ -70,11 +72,50 @@ taskCard=function(t){
   return `<details class="item ${t.fresh?'taskfresh':(t.status==='done'?'good':(over?'absent':'attn'))}" ${openSets.tasks.has(t.id)?'open':''} ontoggle="taskToggleV11('${t.id}',this.open)"><summary><div class="summary task"><span class="name">${esc(t.title||'Без названия')}</span><span class="snippet">${esc((t.text||'').replace(/\n/g,' ').slice(0,140))}</span><span class="status blue">${esc(taskTypeLabel(t.type))}</span><span class="${over?'status red':'muted'}">${fmtDate(t.due)}${pre?' · до старта':''}</span><span>›</span></div></summary><div class="detail"><div class="grid grid3"><div class="field"><label>Название</label><input value="${esc(t.title)}" oninput="changeTask('${t.id}','title',this.value)"></div><div class="field"><label>Тип</label><select onchange="changeTask('${t.id}','type',this.value,true)">${['general','review','platform','post','product','data','media','quiz'].map(k=>`<option value="${k}" ${t.type===k?'selected':''}>${taskTypeLabel(k)}</option>`).join('')}</select></div><div class="field"><label>Срок</label><input type="date" value="${esc(t.due||'')}" onchange="changeTask('${t.id}','due',this.value)"></div></div><div class="field" style="margin-top:8px"><label>Описание / заметка</label><textarea style="min-height:120px" oninput="changeTask('${t.id}','text',this.value)">${esc(t.text||'')}</textarea></div>${attachmentBlock('task',t)}<div class="detailactions"><button class="btn" onclick="convertTask('${t.id}','post')">Перенести в пост</button><button class="btn" onclick="convertTask('${t.id}','product')">Перенести в товар</button><button class="btn doneV11" onclick="setTaskDoneV11('${t.id}','${t.status==='done'?'open':'done'}')">${t.status==='done'?'Вернуть в работу':'Готово'}</button><button class="btn danger" onclick="archiveRecord('tasks','${t.id}')">В архив</button><button class="btn closeV11" onclick="closeTaskNoEditV11('${t.id}')">Закрыть без редактирования</button><button class="btn save" onclick="saveTaskV10('${t.id}')">Сохранить</button></div></div></details>`;
 };
 
+
+// Settings: the operational start date belongs here, not in the Tasks toolbar.
+const _renderSettingsHotfixV122=renderSettings;
+renderSettings=function(section=''){
+  _renderSettingsHotfixV122(section);
+  const body=$('#settingsBody');if(!body)return;
+  const startHtml=`<div class="settings-section" id="workStartSettingsV122"><h3>Точка старта</h3><div class="hint">С этой даты AMP Marketing начинает текущий рабочий учёт. Старые записи остаются в базе, но сроки раньше этой даты не считаются текущей просрочкой.</div><div class="grid grid2" style="margin-top:8px"><div class="field"><label>Дата начала текущего учёта</label><input id="workStartSettingsDateV122" type="date" value="${esc(workStartDate())}"></div><div class="field"><label>&nbsp;</label><button class="btn primary" onclick="saveWorkStartFromSettingsV122()">Сохранить точку старта</button></div></div></div>`;
+  const sections=[...body.querySelectorAll('.settings-section')];
+  const auto=sections.find(x=>x.querySelector('h3')?.textContent.trim()==='Автоматический план');
+  if(auto)auto.insertAdjacentHTML('beforebegin',startHtml);else body.insertAdjacentHTML('afterbegin',startHtml);
+  if(auto){
+    const h=auto.querySelector('h3');
+    if(h&&!auto.querySelector('.autoExplainV122'))h.insertAdjacentHTML('afterend',`<div class="hint autoExplainV122" style="margin:4px 0 9px"><b>Отзывы в неделю</b> — сколько задач на получение реальных отзывов создать за неделю по площадкам, где отзывов давно не было. <b>Пост просрочен</b> — через сколько дней без отмеченной публикации на конкретной активной площадке создать задачу на пост. <b>Товар просрочен</b> — через сколько дней без размещения/обновления товара на конкретной товарной площадке создать задачу на обновление. Автоплан только создаёт рабочие задачи — ничего сам не публикует и отзывы не создаёт.</div>`);
+    [...auto.querySelectorAll('label')].forEach(l=>{
+      if(l.textContent.trim()==='Отзывов в неделю')l.textContent='Задач на отзывы в неделю';
+      if(l.textContent.trim()==='Пост просрочен, дней')l.textContent='Перерыв без поста, дней';
+      if(l.textContent.trim()==='Товар просрочен, дней')l.textContent='Перерыв без обновления товара, дней';
+    });
+  }
+};
+async function saveWorkStartFromSettingsV122(){
+  const v=$('#workStartSettingsDateV122')?.value||AMP_DEFAULT_START_DATE;
+  state.work_start_date=v;markDirty();await manualSave(false);renderSettings();
+}
+
+// Reviews: remove the demo-review bank from the visible product. Keep only real review workflow + company replies.
+renderReviews=function(){
+  let tab=sessionStorage.getItem('reviewTab')||'sources';
+  if(tab!=='sources'&&tab!=='reply'){tab='sources';sessionStorage.reviewTab='sources';}
+  const q=searchValV11('reviews');
+  let rs=[...reviewSources()].sort((a,b)=>(reviewLastDate(a.id)||'0000').localeCompare(reviewLastDate(b.id)||'0000')||a.name.localeCompare(b.name,'ru'));
+  if(q)rs=rs.filter(s=>hasQv11([s.name,...unit().review_people.filter(p=>p.placements?.[s.id]).map(p=>p.name)].join(' '),q));
+  const alerts=reviewAlerts();let body='';
+  if(tab==='sources')body=(alerts.length?`<div class="notice"><strong>Нужно внимание:</strong><br>${alerts.map(x=>'• '+esc(x)).join('<br>')}</div>`:'')+`<div>${rs.map(reviewSourceCard).join('')||'<div class="tile hint">Ничего не найдено.</div>'}</div>`;
+  else body=renderReviewBankV10('reply');
+  const actions=`<div class="reviewHeadActionsV12">${searchInputV11('reviews','Поиск по отзывам / людям')}<button class="btn primary" onclick="addReviewPerson()">+ Человек</button><button class="btn primary" onclick="openReviewSourcePicker()">+ Площадка отзывов</button></div>`;
+  $('#content').innerHTML=head('Отзывы',actions)+`<div class="subtabs"><button class="chip ${tab==='sources'?'active':''}" onclick="sessionStorage.reviewTab='sources';render()">Площадки отзывов</button><button class="chip ${tab==='reply'?'active':''}" onclick="sessionStorage.reviewTab='reply';render()">Ответы на отзывы · 500</button></div>`+body;
+};
+
 renderTasks=function(){
   let st=sessionStorage.getItem('taskStatus')||'open',q=searchValV11('tasks');
   const inboxCount=state.inbox.filter(x=>x.status!=='processed').length;
   const filters=`<div class="filters">${[['inbox',`Входящие${inboxCount?' · '+inboxCount:''}`],['open','Активные'],['overdue','Просроченные'],['done','Готовые'],['all','Все']].map(([k,l])=>`<button class="chip ${st===k?'active':''}" onclick="sessionStorage.taskStatus='${k}';render()">${l}</button>`).join('')}</div>`;
-  const actions=`${searchInputV11('tasks','Поиск задач / входящих')}<button class="btn" onclick="editWorkStartDateV122()">Старт: ${fmtDate(workStartDate())}</button><button class="btn primary" onclick="addTask()">+ Задача</button>`;
+  const actions=`${searchInputV11('tasks','Поиск задач / входящих')}<button class="btn primary" onclick="addTask()">+ Задача</button>`;
   if(st==='inbox'){$('#content').innerHTML=head('Задачи',actions)+filters+renderTaskInboxV12(q);return;}
   let arr=unit().tasks;
   if(st==='open')arr=arr.filter(x=>x.status!=='done');
@@ -84,6 +125,7 @@ renderTasks=function(){
   arr=[...arr].sort((a,b)=>(b.fresh?1:0)-(a.fresh?1:0)||(a.status==='done')-(b.status==='done')||(a.due||'9999').localeCompare(b.due||'9999')||(b.created_at||'').localeCompare(a.created_at||''));
   $('#content').innerHTML=head('Задачи',actions)+filters+(arr.map(taskCard).join('')||'<div class="tile hint">Задач нет.</div>');
 };
+
 
 render();
 })();
