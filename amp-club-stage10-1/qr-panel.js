@@ -1,0 +1,1 @@
+/* test QR panel */
