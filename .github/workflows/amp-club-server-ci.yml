@@ -48,4 +48,6 @@ jobs:
         run: python -m py_compile amp-club-backend/api/index.py
       - name: PostgreSQL end-to-end tests
         working-directory: amp-club-backend
+        env:
+          PYTHONPATH: .
         run: pytest -q
