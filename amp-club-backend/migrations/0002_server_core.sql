@@ -89,62 +89,37 @@ CREATE TABLE IF NOT EXISTS support_tickets (
 );
 CREATE INDEX IF NOT EXISTS support_tickets_customer_idx ON support_tickets(customer_id, created_at DESC);
 
-CREATE OR REPLACE FUNCTION amp_deny_immutable_mutation() RETURNS trigger
-LANGUAGE plpgsql
-AS 'BEGIN
-    RAISE EXCEPTION ''immutable_table'';
-END';
-
-DROP TRIGGER IF EXISTS consent_ledger_immutable ON consent_ledger;
-CREATE TRIGGER consent_ledger_immutable
-BEFORE UPDATE OR DELETE ON consent_ledger
-FOR EACH ROW EXECUTE FUNCTION amp_deny_immutable_mutation();
-
-DROP TRIGGER IF EXISTS am_ledger_immutable ON am_ledger;
-CREATE TRIGGER am_ledger_immutable
-BEFORE UPDATE OR DELETE ON am_ledger
-FOR EACH ROW EXECUTE FUNCTION amp_deny_immutable_mutation();
-
-CREATE OR REPLACE FUNCTION amp_protect_customer_balance() RETURNS trigger
-LANGUAGE plpgsql
-AS 'BEGIN
-    IF NEW.balance_am IS DISTINCT FROM OLD.balance_am
-       AND COALESCE(current_setting(''amp.ledger_balance_write'', true),''off'') <> ''on'' THEN
-        RAISE EXCEPTION ''balance_must_be_changed_through_ledger'';
-    END IF;
-    RETURN NEW;
-END';
-
-DROP TRIGGER IF EXISTS customers_balance_guard ON customers;
-CREATE TRIGGER customers_balance_guard
-BEFORE UPDATE OF balance_am ON customers
-FOR EACH ROW EXECUTE FUNCTION amp_protect_customer_balance();
-
-CREATE OR REPLACE FUNCTION amp_apply_ledger_balance() RETURNS trigger
-LANGUAGE plpgsql
-AS 'BEGIN
-    PERFORM set_config(''amp.ledger_balance_write'',''on'',true);
-    UPDATE customers
-       SET balance_am = balance_am + NEW.amount,
-           updated_at = now()
-     WHERE id = NEW.customer_id;
-    PERFORM set_config(''amp.ledger_balance_write'',''off'',true);
-    RETURN NEW;
-END';
-
-DROP TRIGGER IF EXISTS am_ledger_apply_balance ON am_ledger;
-CREATE TRIGGER am_ledger_apply_balance
-AFTER INSERT ON am_ledger
-FOR EACH ROW EXECUTE FUNCTION amp_apply_ledger_balance();
+CREATE OR REPLACE RULE consent_ledger_no_update AS
+ON UPDATE TO consent_ledger DO INSTEAD NOTHING;
+CREATE OR REPLACE RULE consent_ledger_no_delete AS
+ON DELETE TO consent_ledger DO INSTEAD NOTHING;
+CREATE OR REPLACE RULE am_ledger_no_update AS
+ON UPDATE TO am_ledger DO INSTEAD NOTHING;
+CREATE OR REPLACE RULE am_ledger_no_delete AS
+ON DELETE TO am_ledger DO INSTEAD NOTHING;
 
 CREATE OR REPLACE VIEW customer_ledger_balances AS
 SELECT c.id AS customer_id,
-       c.balance_am AS cached_balance_am,
-       COALESCE(SUM(l.amount),0)::bigint AS ledger_balance_am,
-       (c.balance_am = COALESCE(SUM(l.amount),0)::bigint) AS is_consistent
-FROM customers c
-LEFT JOIN am_ledger l ON l.customer_id=c.id
-GROUP BY c.id,c.balance_am;
+       COALESCE((SELECT SUM(l.amount) FROM am_ledger l WHERE l.customer_id=c.id),0)::bigint AS balance_am,
+       c.balance_am AS legacy_cached_balance_am
+FROM customers c;
+
+CREATE OR REPLACE VIEW customer_profiles AS
+SELECT c.id,
+       c.phone,
+       c.name,
+       c.birth_date,
+       c.gender,
+       c.discount_percent,
+       COALESCE((SELECT SUM(l.amount) FROM am_ledger l WHERE l.customer_id=c.id),0)::bigint AS balance_am,
+       c.ruble_remainder,
+       c.crm_number,
+       c.telegram_linked,
+       c.max_linked,
+       c.is_active,
+       c.created_at,
+       c.updated_at
+FROM customers c;
 
 CREATE OR REPLACE VIEW current_consents AS
 SELECT DISTINCT ON (customer_id, consent_type)
