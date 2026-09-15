@@ -40,6 +40,7 @@
     .page-info{display:flex;justify-content:space-between;gap:6px;padding:10px;font-size:13px}
     .page-info strong{overflow:hidden;text-overflow:ellipsis}
     .page-ready{color:#52d89a}.page-empty{color:#7890aa}
+    .page-auto{color:#f1c84b}
     .page-list-actions{grid-column:1/-1;display:grid;gap:8px;margin-top:4px}
     .sheet-modal{position:fixed;z-index:90;inset:0;background:#07111f;display:flex;flex-direction:column}
     .sheet-modal.hide{display:none}
@@ -60,6 +61,13 @@
     .help-step i{width:38px;height:38px;border-radius:12px;background:#1c3856;display:grid;place-items:center;font-style:normal;font-size:20px}
     .scan-help{width:44px;height:44px;border:0;border-radius:14px;background:#13243a;color:#fff;font-weight:900;font-size:20px}
     .event-limit{color:#ffd083;margin-top:8px;font-size:13px}
+    .eventrow{padding:12px;border:1px solid #263f5b;border-radius:15px;background:#0b192b}
+    .eventrow select,.eventrow input{min-height:44px}
+    .eventrow>button{font-size:22px;font-weight:800;background:#4b2330!important}
+    .eventpreview{border:1px solid #dce5ed}
+    .event-columns{display:grid;grid-template-columns:100px 70px 1fr 42px;gap:7px;padding:0 12px 5px;color:#8da4bb;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+    .event-note{padding:12px 14px;border-radius:13px;background:#10253a;border:1px solid #28445f;color:#c7d7e6;font-size:13px;line-height:1.4;margin:0 0 14px}
+    @media(max-width:520px){.event-columns{grid-template-columns:86px 58px 1fr 38px;padding-left:8px;padding-right:8px}.event-columns span:last-child{font-size:0}.event-columns span:last-child:after{content:'×';font-size:13px}}
     @media(min-width:700px){.page-grid{grid-template-columns:repeat(4,minmax(0,1fr));max-width:900px;margin:auto}.pdf-grid{grid-template-columns:1fr 1fr}}
   `;
   document.head.appendChild(style);
@@ -80,7 +88,7 @@
       const accountName = document.getElementById('accountName');
       if (accountName) accountName.textContent = 'Проекты на этом устройстве';
       const accountSmall = document.querySelector('.accountmeta small');
-      if (accountSmall) accountSmall.textContent = 'Аккаунт и синхронизация подключатся на серверном этапе';
+      if (accountSmall) accountSmall.textContent = 'Все проекты пока хранятся только на этом устройстве';
       const badge = document.querySelector('.serverbadge');
       if (badge) badge.textContent = 'Можно работать без регистрации';
 
@@ -270,12 +278,90 @@
     ctx.restore();return c;
   }
 
+  function rounded(ctx,x,y,w,h,r,fill,stroke){
+    ctx.beginPath();
+    if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h);
+    if(fill){ctx.fillStyle=fill;ctx.fill()}
+    if(stroke){ctx.strokeStyle=stroke;ctx.stroke()}
+  }
+
+  function wrapped(ctx,text,x,y,maxWidth,lineHeight,maxLines=4){
+    const words=String(text).split(/\s+/);let line='',lines=[];
+    for(const word of words){const next=line?line+' '+word:word;if(ctx.measureText(next).width>maxWidth&&line){lines.push(line);line=word}else line=next}
+    if(line)lines.push(line);
+    lines.slice(0,maxLines).forEach((value,index)=>ctx.fillText(value,x,y+index*lineHeight));
+  }
+
+  function backCover(format='A4'){
+    const c=document.createElement('canvas');
+    c.width=format==='A3'?3508:2480;c.height=format==='A3'?4961:3508;
+    const ctx=c.getContext('2d'),W=c.width,H=c.height,u=W/2480;
+    const bg=ctx.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#fffdf5');bg.addColorStop(.55,'#f3f8fb');bg.addColorStop(1,'#fff1f6');ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+    ctx.globalAlpha=.14;ctx.fillStyle='#55b8db';ctx.beginPath();ctx.arc(W*.08,H*.08,W*.20,0,Math.PI*2);ctx.fill();ctx.fillStyle='#df5d91';ctx.beginPath();ctx.arc(W*.94,H*.23,W*.17,0,Math.PI*2);ctx.fill();ctx.fillStyle='#f1c84b';ctx.beginPath();ctx.arc(W*.76,H*.94,W*.23,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+    const left=170*u,right=W-170*u;
+    ctx.fillStyle='#33506b';ctx.font=`800 ${30*u}px Arial`;ctx.fillText('АМПЛИТУДА · НАРИСУЙ САМ',left,190*u);
+    ctx.fillStyle='#102033';ctx.font=`900 ${102*u}px Arial`;ctx.fillText('Нарисуй свой год',left,335*u);
+    ctx.fillStyle='#52677b';ctx.font=`500 ${39*u}px Arial`;wrapped(ctx,'Календарь для детей, взрослых и семейных историй',left,410*u,right-left,54*u,2);
+    const cards=[
+      ['1','Рисуйте','Карандашами, фломастерами, мелками или красками.'],
+      ['2','Снимайте через приложение','Оно выровняет лист, очистит фон и отделит рисунок от сетки.'],
+      ['3','Проверьте даты','Добавьте дни рождения и события — не больше двух на один день.'],
+      ['4','Получите два файла','Приложение подготовит PDF сразу в форматах A4 и A3.']
+    ];
+    let y=590*u,cardH=300*u,gap=34*u;
+    for(const [num,title,body] of cards){
+      rounded(ctx,left,y,right-left,cardH,34*u,'rgba(255,255,255,.82)','rgba(87,123,153,.18)');
+      const colors=['#55b8db','#df5d91','#f1c84b','#607fbe'];const color=colors[+num-1];
+      rounded(ctx,left+34*u,y+44*u,116*u,116*u,34*u,color);
+      ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=`900 ${56*u}px Arial`;ctx.fillText(num,left+92*u,y+102*u);
+      ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.fillStyle='#102033';ctx.font=`850 ${43*u}px Arial`;ctx.fillText(title,left+182*u,y+88*u);
+      ctx.fillStyle='#52677b';ctx.font=`500 ${31*u}px Arial`;wrapped(ctx,body,left+182*u,y+142*u,right-left-225*u,43*u,3);
+      y+=cardH+gap;
+    }
+    const qr=540*u,qx=left,qy=y+55*u;
+    rounded(ctx,qx,qy,qr,qr,42*u,'#fff','#9eb5c8');ctx.lineWidth=5*u;ctx.setLineDash([20*u,16*u]);ctx.strokeStyle='#7f9bb2';ctx.strokeRect(qx+32*u,qy+32*u,qr-64*u,qr-64*u);ctx.setLineDash([]);
+    ctx.fillStyle='#1c3f5e';ctx.textAlign='center';ctx.font=`900 ${42*u}px Arial`;ctx.fillText('МЕСТО ДЛЯ QR-КОДА',qx+qr/2,qy+qr*.47);
+    ctx.fillStyle='#71869a';ctx.font=`500 ${28*u}px Arial`;ctx.fillText('Ссылка на приложение',qx+qr/2,qy+qr*.57);
+    const tx=qx+qr+75*u,tw=right-tx;
+    ctx.textAlign='left';ctx.fillStyle='#102033';ctx.font=`900 ${54*u}px Arial`;ctx.fillText('С чего начать?',tx,qy+64*u);
+    ctx.fillStyle='#52677b';ctx.font=`500 ${31*u}px Arial`;wrapped(ctx,'Откройте приложение по QR-коду, создайте календарь и начните с обложки. Во время съёмки приложение покажет подсказки.',tx,qy+124*u,tw,46*u,6);
+    rounded(ctx,tx,qy+355*u,tw,118*u,28*u,'#102a43');ctx.fillStyle='#fff';ctx.font=`800 ${31*u}px Arial`;ctx.fillText('Поддержка: Telegram или MAX',tx+35*u,qy+427*u);
+    ctx.fillStyle='#6b7e90';ctx.font=`600 ${25*u}px Arial`;ctx.fillText('Рисунки остаются вашими. Мы используем их только для создания календаря.',left,H-135*u);
+    ctx.textAlign='right';ctx.fillStyle='#314b63';ctx.font=`800 ${27*u}px Arial`;ctx.fillText('amplituda · Нижний Новгород',right,H-135*u);
+    return c;
+  }
+
   App.register({
     id: 'calendar-layout',
     version: '1.0.0',
     start() {
       window.renderDigitalGrid = finalGrid;
       window.overlayEvents = finalEvents;
+    }
+  });
+
+  App.register({
+    id: 'event-editor-help',
+    version: '1.0.0',
+    start() {
+      const title=document.querySelector('#dates .events h2');
+      const lead=document.querySelector('#dates .events>p.subtle');
+      const list=document.getElementById('eventList');
+      if(title)title.textContent='Дни рождения и события';
+      if(lead)lead.outerHTML='<div class="event-note">Найденные на бумаге даты появятся здесь. Выберите месяц и число, добавьте подпись. Крестик справа полностью удаляет событие. На один день можно добавить не больше двух записей.</div>';
+      if(list&&!document.querySelector('#dates .event-columns')){
+        const labels=document.createElement('div');labels.className='event-columns';
+        labels.innerHTML='<span>Месяц</span><span>Число</span><span>Подпись</span><span>Удалить</span>';
+        list.before(labels);
+      }
+      if(list){
+        const labelRows=()=>list.querySelectorAll('.eventrow').forEach(row=>{
+          const remove=row.querySelector('button');if(remove){remove.title='Удалить событие';remove.setAttribute('aria-label','Удалить событие')}
+          const fields=row.querySelectorAll('select,input');
+          fields[0]?.setAttribute('aria-label','Месяц');fields[1]?.setAttribute('aria-label','Число');fields[2]?.setAttribute('aria-label','Подпись события');
+        });
+        new MutationObserver(labelRows).observe(list,{childList:true,subtree:true});labelRows();
+      }
     }
   });
 
@@ -299,7 +385,15 @@
   async function pagePreview(index, mode='final') {
     const modal=ensureSheetModal(), image=modal.querySelector('.sheet-image');
     modal.dataset.page=String(index);modal.classList.remove('hide');
-    modal.querySelector('.title').textContent=P[index];
+    const automatic=index===13;
+    modal.querySelector('.title').textContent=automatic?'Задняя обложка':P[index];
+    modal.querySelector('.segmented').style.display=automatic?'none':'grid';
+    modal.querySelector('.sheet-actions').style.display=automatic?'none':'grid';
+    if(automatic){
+      const shown=await toBlob(backCover('A4'),.985);
+      if(image.dataset.url)URL.revokeObjectURL(image.dataset.url);
+      image.dataset.url=URL.createObjectURL(shown);image.src=image.dataset.url;return;
+    }
     modal.querySelector('.events').style.visibility=index?'visible':'hidden';
     modal.querySelector('.final').classList.toggle('on',mode==='final');
     modal.querySelector('.source').classList.toggle('on',mode==='source');
@@ -353,6 +447,10 @@
             }catch(error){console.error(error)}
           }
         }
+        const back=document.createElement('button');back.type='button';back.className='page-card';
+        back.innerHTML='<div class="page-thumb"><span>✦</span></div><div class="page-info"><strong>Задняя обложка</strong><span class="page-auto">Автоматически</span></div>';
+        back.onclick=()=>pagePreview(13);list.appendChild(back);
+        try{const preview=await toBlob(backCover('A4'),.78),url=URL.createObjectURL(preview),img=new Image();img.onload=()=>URL.revokeObjectURL(url);img.src=url;back.querySelector('.page-thumb').replaceChildren(img)}catch{}
         const actions=document.createElement('div');actions.className='page-list-actions';
         if(done===13){
           const button=document.createElement('button');button.className='btn primary';button.textContent='Проверить события и собрать PDF';button.onclick=openDates;actions.appendChild(button);
@@ -391,11 +489,14 @@
       if(index>0) finalEvents(canvas,index);
       const jpeg=await toBlob(canvas,.96);
       pages.push({bytes:new Uint8Array(await jpeg.arrayBuffer()),w:canvas.width,h:canvas.height});
-      onProgress?.(index+1,13);
+      onProgress?.(index+1,14);
       await new Promise(resolve=>setTimeout(resolve,0));
     }
+    const rear=backCover(format),rearJpeg=await toBlob(rear,.96);
+    pages.push({bytes:new Uint8Array(await rearJpeg.arrayBuffer()),w:rear.width,h:rear.height});
+    onProgress?.(14,14);
     const objects=[],pageIds=[];let next=3;
-    for(let index=0;index<13;index++){
+    for(let index=0;index<pages.length;index++){
       const pageId=next++,imageId=next++,contentId=next++;pageIds.push(pageId);
       const image=pages[index],stream=`q\n${target.pw} 0 0 ${target.ph} 0 0 cm\n/Im0 Do\nQ\n`;
       objects[pageId]=[u8(`${pageId} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${target.pw} ${target.ph}] /Resources << /XObject << /Im0 ${imageId} 0 R >> >> /Contents ${contentId} 0 R >>\nendobj\n`)];
@@ -403,7 +504,7 @@
       objects[contentId]=[u8(`${contentId} 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}endstream\nendobj\n`)];
     }
     objects[1]=[u8('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n')];
-    objects[2]=[u8(`2 0 obj\n<< /Type /Pages /Count 13 /Kids [${pageIds.map(id=>id+' 0 R').join(' ')}] >>\nendobj\n`)];
+    objects[2]=[u8(`2 0 obj\n<< /Type /Pages /Count ${pages.length} /Kids [${pageIds.map(id=>id+' 0 R').join(' ')}] >>\nendobj\n`)];
     const header=u8('%PDF-1.4\n%âãÏÓ\n'),chunks=[header],offsets=[0];let position=header.length,max=objects.length-1;
     for(let id=1;id<=max;id++){offsets[id]=position;for(const chunk of objects[id]){chunks.push(chunk);position+=chunk.length}}
     const xref=position;let table=`xref\n0 ${max+1}\n0000000000 65535 f \n`;
@@ -452,7 +553,7 @@
     version: '1.0.0',
     start() {
       const formats=document.querySelector('#dates .summary');
-      if(formats) formats.innerHTML='<b>Два готовых файла</b><div class="dual-note">Приложение автоматически подготовит календарь сразу в A4 и A3. Вы сможете скачать или отправить любой файл.</div>';
+      if(formats) formats.innerHTML='<b>Два готовых файла</b><div class="dual-note">Приложение автоматически подготовит календарь сразу в A4 и A3 и добавит красивую заднюю обложку с инструкцией и местом для QR-кода.</div>';
       const oldButton=document.getElementById('downloadPdf');
       if(oldButton) oldButton.classList.add('hide');
       S.pdfs=S.pdfs||{};
@@ -467,7 +568,7 @@
         document.getElementById('sendPrint').disabled=true;
         document.getElementById('pdfProgress').style.width='2%';
         document.getElementById('pdfState').textContent='Подготавливаю A4…';
-        document.getElementById('finishSummary').innerHTML=`<b>Будут созданы A4 и A3</b>13 страниц · событий: ${(S.proj.events||[]).filter(e=>e.text&&e.text.trim()).length}<br><span class="mini">Оба файла собираются автоматически из одного проекта.</span>`;
+        document.getElementById('finishSummary').innerHTML=`<b>Будут созданы A4 и A3</b>13 отснятых страниц + задняя обложка · событий: ${(S.proj.events||[]).filter(e=>e.text&&e.text.trim()).length}<br><span class="mini">Оба файла собираются автоматически из одного проекта.</span>`;
         try{
           S.pdfs.A4=await buildPdf('A4',(done,total)=>{
             document.getElementById('pdfProgress').style.width=`${Math.round(done/total*48)}%`;
@@ -490,7 +591,7 @@
       };
       document.getElementById('buildBtn').onclick=window.buildFinal;
       document.getElementById('fback').onclick=openDates;
-      document.getElementById('sendPrint').textContent='Отправить в типографию — подключим на сервере';
+      document.getElementById('sendPrint').textContent='Отправить в типографию';
     }
   });
 
