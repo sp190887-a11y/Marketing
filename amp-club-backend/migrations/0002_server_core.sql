@@ -97,28 +97,18 @@ CREATE OR REPLACE RULE am_ledger_no_update AS
 ON UPDATE TO am_ledger DO INSTEAD NOTHING;
 CREATE OR REPLACE RULE am_ledger_no_delete AS
 ON DELETE TO am_ledger DO INSTEAD NOTHING;
+CREATE OR REPLACE RULE am_ledger_apply_balance AS
+ON INSERT TO am_ledger DO ALSO
+UPDATE customers
+   SET balance_am = balance_am + NEW.amount,
+       updated_at = now()
+ WHERE id = NEW.customer_id;
 
 CREATE OR REPLACE VIEW customer_ledger_balances AS
 SELECT c.id AS customer_id,
-       COALESCE((SELECT SUM(l.amount) FROM am_ledger l WHERE l.customer_id=c.id),0)::bigint AS balance_am,
-       c.balance_am AS legacy_cached_balance_am
-FROM customers c;
-
-CREATE OR REPLACE VIEW customer_profiles AS
-SELECT c.id,
-       c.phone,
-       c.name,
-       c.birth_date,
-       c.gender,
-       c.discount_percent,
-       COALESCE((SELECT SUM(l.amount) FROM am_ledger l WHERE l.customer_id=c.id),0)::bigint AS balance_am,
-       c.ruble_remainder,
-       c.crm_number,
-       c.telegram_linked,
-       c.max_linked,
-       c.is_active,
-       c.created_at,
-       c.updated_at
+       c.balance_am AS cached_balance_am,
+       COALESCE((SELECT SUM(l.amount) FROM am_ledger l WHERE l.customer_id=c.id),0)::bigint AS ledger_balance_am,
+       (c.balance_am = COALESCE((SELECT SUM(l.amount) FROM am_ledger l WHERE l.customer_id=c.id),0)::bigint) AS is_consistent
 FROM customers c;
 
 CREATE OR REPLACE VIEW current_consents AS
