@@ -71,6 +71,23 @@ class ServerTests(unittest.TestCase):
         status, _ = request("PUT", "/api/projects/project_123/pages/13/source", headers=self.owner, raw=b"x" * 200, content_type="image/jpeg")
         self.assertEqual(status, "400 Bad Request")
 
+    def test_email_code_session_and_logout(self):
+        status, issued = request("POST", "/api/auth/email/request", {"email": "family@example.ru"})
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(len(issued["development_code"]), 6)
+        status, verified = request("POST", "/api/auth/email/verify", {
+            "email": "family@example.ru", "code": issued["development_code"],
+        })
+        self.assertEqual(status, "200 OK")
+        auth_header = {"Authorization": "Bearer " + verified["token"]}
+        status, session = request("GET", "/api/auth/session", headers=auth_header)
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(session["user"]["email"], "family@example.ru")
+        status, _ = request("POST", "/api/auth/logout", {}, auth_header)
+        self.assertEqual(status, "200 OK")
+        status, _ = request("GET", "/api/auth/session", headers=auth_header)
+        self.assertEqual(status, "401 Unauthorized")
+
 
 if __name__ == "__main__":
     unittest.main()
