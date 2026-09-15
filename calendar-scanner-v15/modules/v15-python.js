@@ -5,6 +5,7 @@
   const App = window.CalendarApp;
   if (!App) return;
   const DEVICE_KEY = 'calendar_device_id_v15';
+  const AUTH_KEY = 'calendar_auth_token_v15';
   const state = {online:false, config:null, syncTimer:null};
 
   function deviceId() {
@@ -19,6 +20,8 @@
   async function api(path, options={}) {
     const headers = new Headers(options.headers || {});
     headers.set('X-Device-Id', deviceId());
+    const token = localStorage.getItem(AUTH_KEY);
+    if (token) headers.set('Authorization', 'Bearer ' + token);
     if (options.body && !(options.body instanceof Blob) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
     const response = await fetch(path, {...options, headers});
     const type = response.headers.get('content-type') || '';
@@ -105,14 +108,51 @@
     submit.onclick = async event => {
       if (!controls.querySelector('[data-accept-terms]').checked) { toast('Примите соглашение и оферту'); return; }
       if (!controls.querySelector('[data-accept-personal]').checked) { toast('Подтвердите отдельное согласие на обработку данных'); return; }
-      original?.call(submit, event);
-      if (state.online) {
-        for (const slug of ['terms','offer','personal-data-consent']) {
-          try { await api('/api/consents',{method:'POST',body:JSON.stringify({document_slug:slug,accepted:true,source:'email-registration'})}); }
-          catch (error) { console.warn('Consent log deferred:', error.message); }
+      const email = pane.querySelector('#menuEmailV15').value.trim();
+      let code = pane.querySelector('#menuCodeV15');
+      try {
+        if (!code) {
+          const requested = await api('/api/auth/email/request',{method:'POST',body:JSON.stringify({email})});
+          code = document.createElement('input');
+          code.id='menuCodeV15'; code.inputMode='numeric'; code.autocomplete='one-time-code';
+          code.maxLength=6; code.placeholder='Код из письма'; code.style.marginTop='10px';
+          controls.parentNode.insertBefore(code, controls);
+          if (requested.development_code) code.value=requested.development_code;
+          submit.textContent='Войти'; code.focus();
+          toast(requested.delivery==='development' ? 'Тестовый код подставлен' : 'Код отправлен на почту');
+          return;
         }
+        const verified = await api('/api/auth/email/verify',{method:'POST',body:JSON.stringify({email,code:code.value})});
+        localStorage.setItem(AUTH_KEY, verified.token);
+        original?.call(submit, event);
+        for (const slug of ['terms','offer','personal-data-consent']) {
+          await api('/api/consents',{method:'POST',body:JSON.stringify({document_slug:slug,accepted:true,source:'email-registration'})});
+        }
+        queueProjectSync();
+        toast('Вход выполнен');
+      } catch (error) {
+        toast(error.message || 'Не удалось выполнить вход');
       }
     };
+  }
+
+  function connectAuthProviders() {
+    const pane = document.querySelector('#accountModal [data-account-pane="login"]');
+    if (!pane) return;
+    pane.querySelectorAll('[data-social]').forEach(button => button.onclick = () => {
+      const provider=button.dataset.social;
+      const label=provider==='max'?'MAX':provider==='vk'?'VK':'Telegram';
+      toast(state.config?.auth?.[provider] ? `Вход через ${label} готов к подключению перенаправления` : `Вход через ${label} ещё не настроен`);
+    });
+    const logout=document.querySelector('#accountModal [data-local-logout]');
+    if (logout) {
+      const fallback=logout.onclick;
+      logout.onclick=async event=>{
+        try { if(localStorage.getItem(AUTH_KEY)) await api('/api/auth/logout',{method:'POST'}); } catch {}
+        localStorage.removeItem(AUTH_KEY);
+        fallback?.call(logout,event);
+      };
+    }
   }
 
   async function openLegal(slug, fallback) {
@@ -166,7 +206,7 @@
     id: 'python-server-bridge',
     version: '1.3.0',
     async start() {
-      App.version='15.3';
+      App.version='15.4';
       App.server={state,api,deviceId,queueProjectSync,uploadPage};
       const originalSaveMeta=window.saveMeta;
       if (typeof originalSaveMeta==='function') window.saveMeta=function(...args){const result=originalSaveMeta.apply(this,args);queueProjectSync();return result};
@@ -189,6 +229,7 @@
       try {
         state.config=await api('/api/config'); state.online=true;
         addConsentControls();
+        connectAuthProviders();
         const badge=document.querySelector('.serverbadge');if(badge)badge.textContent='Сервер подключен · проекты синхронизируются';
         await Promise.all([connectLegalDocuments(),restoreProjects()]);
       } catch {
