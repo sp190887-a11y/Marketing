@@ -5,7 +5,8 @@
     // Keep the previous cleanup first if it exists.
     try{ if(typeof oldClean==='function') oldClean(c); }catch(e){}
     const ctx=c.getContext('2d',{willReadFrequently:true}), W=c.width, H=c.height;
-    const cut=Math.floor(H*0.84); // drawing zone only; grid is replaced separately anyway
+    // The cover has no calendar grid, so clean its entire surface.
+    const cut=S.i===0?H:Math.floor(H*0.84);
     const img=ctx.getImageData(0,0,W,cut), d=img.data;
     // Estimate paper white point from bright low-saturation samples.
     const ys=[];
@@ -50,4 +51,3 @@
     document.querySelectorAll('#review header small').forEach(x=>x.textContent='Проверка кадра · V14.4');
   }catch(e){}
 })();
-
