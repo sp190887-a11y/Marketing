@@ -298,12 +298,14 @@
     const ctx=c.getContext('2d'),W=c.width,H=c.height,u=W/2480;
     const bg=ctx.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#fffdf5');bg.addColorStop(.55,'#f3f8fb');bg.addColorStop(1,'#fff1f6');ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
     ctx.globalAlpha=.14;ctx.fillStyle='#55b8db';ctx.beginPath();ctx.arc(W*.08,H*.08,W*.20,0,Math.PI*2);ctx.fill();ctx.fillStyle='#df5d91';ctx.beginPath();ctx.arc(W*.94,H*.23,W*.17,0,Math.PI*2);ctx.fill();ctx.fillStyle='#f1c84b';ctx.beginPath();ctx.arc(W*.76,H*.94,W*.23,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+    ctx.save();ctx.translate(W-360*u,250*u);ctx.rotate(-.55);rounded(ctx,-42*u,-155*u,84*u,310*u,34*u,'#f1c84b','#b98626');ctx.fillStyle='#df5d91';ctx.fillRect(-42*u,55*u,84*u,52*u);ctx.fillStyle='#f5dcc2';ctx.beginPath();ctx.moveTo(-42*u,-155*u);ctx.lineTo(0,-230*u);ctx.lineTo(42*u,-155*u);ctx.fill();ctx.fillStyle='#24384c';ctx.beginPath();ctx.moveTo(-10*u,-212*u);ctx.lineTo(0,-230*u);ctx.lineTo(10*u,-212*u);ctx.fill();ctx.restore();
+    ctx.strokeStyle='#55b8db';ctx.lineWidth=18*u;ctx.lineCap='round';ctx.beginPath();ctx.arc(W-265*u,455*u,80*u,Math.PI,Math.PI*1.82);ctx.stroke();ctx.strokeStyle='#df5d91';ctx.beginPath();ctx.arc(W-265*u,455*u,55*u,Math.PI,Math.PI*1.82);ctx.stroke();ctx.strokeStyle='#f1c84b';ctx.beginPath();ctx.arc(W-265*u,455*u,30*u,Math.PI,Math.PI*1.82);ctx.stroke();
     const left=170*u,right=W-170*u;
     ctx.fillStyle='#33506b';ctx.font=`800 ${30*u}px Arial`;ctx.fillText('АМПЛИТУДА · НАРИСУЙ САМ',left,190*u);
     ctx.fillStyle='#102033';ctx.font=`900 ${102*u}px Arial`;ctx.fillText('Нарисуй свой год',left,335*u);
     ctx.fillStyle='#52677b';ctx.font=`500 ${39*u}px Arial`;wrapped(ctx,'Календарь для детей, взрослых и семейных историй',left,410*u,right-left,54*u,2);
     const cards=[
-      ['1','Рисуйте','Карандашами, фломастерами, мелками или красками.'],
+      ['1','Рисуйте','Карандашами, фломастерами, мелками или красками. Не выходите за рабочую область и не закрывайте угловые метки.'],
       ['2','Снимайте через приложение','Оно выровняет лист, очистит фон и отделит рисунок от сетки.'],
       ['3','Проверьте даты','Добавьте дни рождения и события — не больше двух на один день.'],
       ['4','Получите два файла','Приложение подготовит PDF сразу в форматах A4 и A3.']
