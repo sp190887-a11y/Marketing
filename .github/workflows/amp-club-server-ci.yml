@@ -33,7 +33,10 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ampclub_test
       SMS_MODE: test
       OTP_PEPPER: ci-test-pepper
+      MFA_RECOVERY_PEPPER: ci-recovery-pepper
+      APP_ENCRYPTION_KEY: Ao5usHPfyp5ORBzsg2YD6AwAIGouc1BEhWqDM_kPG9o=
       ADMIN_BOOTSTRAP_TOKEN: ci-bootstrap-token
+      CRM_WEBHOOK_SECRET: ci-crm-secret
       ALLOWED_ORIGINS: https://club.amplituda-nn.ru,https://sp190887-a11y.github.io
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +48,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r amp-club-backend/requirements.txt
       - name: Python syntax
-        run: python -m py_compile amp-club-backend/api/index.py
+        run: |
+          python -m py_compile amp-club-backend/api/index.py
+          python -m py_compile amp-club-backend/api/crm.py
+          python -m py_compile amp-club-backend/api/mfa.py
+          python -m py_compile amp-club-backend/api/app.py
       - name: PostgreSQL end-to-end tests
         working-directory: amp-club-backend
         env:
