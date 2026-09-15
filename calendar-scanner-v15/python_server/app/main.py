@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable
 from urllib.parse import parse_qs, unquote
 
+from .auth import AuthService
 from .config import settings
 from .database import Database, utc_now
 from .legal_documents import LEGAL_VERSION, get_documents
@@ -17,6 +18,7 @@ from .legal_documents import LEGAL_VERSION, get_documents
 
 db = Database(settings.database_path)
 db.initialize()
+auth = AuthService(db, settings)
 settings.uploads_dir.mkdir(parents=True, exist_ok=True)
 
 ID_RE = re.compile(r"^[A-Za-z0-9_-]{6,80}$")
@@ -47,6 +49,9 @@ def json_response(start_response: Callable, status: str, payload: Any) -> list[b
 
 
 def owner_key(environ: dict[str, Any]) -> str:
+    user = auth.session_user(environ.get("HTTP_AUTHORIZATION") or "")
+    if user:
+        return "user_" + str(user["id"])
     value = (environ.get("HTTP_X_DEVICE_ID") or "").strip()
     if not ID_RE.fullmatch(value):
         raise ValueError("Требуется корректный заголовок X-Device-Id")
@@ -116,9 +121,30 @@ def api(environ: dict[str, Any], start_response: Callable, method: str, path: st
             "version": settings.app_version,
             "guest_mode": True,
             "pdf_formats": ["A4", "A3"],
-            "auth": {"email": False, "telegram": False, "max": False, "vk": False},
+            "auth": auth.providers(),
             "operator_ready": not settings.operator_inn.startswith("["),
         })
+
+    if method == "GET" and path == "/api/auth/providers":
+        return json_response(start_response, "200 OK", {"providers": auth.providers()})
+
+    if method == "POST" and path == "/api/auth/email/request":
+        data = read_json(environ)
+        return json_response(start_response, "200 OK", auth.request_email_code(data.get("email")))
+
+    if method == "POST" and path == "/api/auth/email/verify":
+        data = read_json(environ)
+        return json_response(start_response, "200 OK", auth.verify_email_code(data.get("email"), data.get("code")))
+
+    if method == "GET" and path == "/api/auth/session":
+        user = auth.session_user(environ.get("HTTP_AUTHORIZATION") or "")
+        if not user:
+            return json_response(start_response, "401 Unauthorized", {"error": "Требуется вход"})
+        return json_response(start_response, "200 OK", {"ok": True, "user": user})
+
+    if method == "POST" and path == "/api/auth/logout":
+        auth.logout(environ.get("HTTP_AUTHORIZATION") or "")
+        return json_response(start_response, "200 OK", {"ok": True})
 
     if method == "GET" and path == "/api/legal":
         docs = get_documents(settings)
