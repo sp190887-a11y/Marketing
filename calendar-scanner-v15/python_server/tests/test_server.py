@@ -88,6 +88,14 @@ class ServerTests(unittest.TestCase):
         status, _ = request("GET", "/api/auth/session", headers=auth_header)
         self.assertEqual(status, "401 Unauthorized")
 
+    def test_frontend_contract_for_pages_and_back_cover(self):
+        source = (Path(__file__).resolve().parents[2] / "modules" / "v15.js").read_text(encoding="utf-8")
+        self.assertIn("for(let index=0;index<13;index++){\n      const blob=await get", source)
+        self.assertIn("pages.push({bytes:new Uint8Array(await rearJpeg.arrayBuffer())", source)
+        self.assertIn("for(let index=0;index<pages.length;index++){\n      const pageId=", source)
+        self.assertIn("/Count ${pages.length}", source)
+        self.assertIn("Задняя обложка", source)
+
 
 if __name__ == "__main__":
     unittest.main()
