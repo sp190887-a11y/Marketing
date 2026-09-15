@@ -20,6 +20,8 @@ jobs:
           node --check amp-club-stage10-1/app-e.js
           node --check amp-club-stage10-1/save-links.js
           node --check amp-club-stage10-1/app-f.js
+          node --check amp-club-stage10-1/client-role.js
+          node --check amp-club-stage10-1/legal-ui.js
           node --check amp-club-stage10-1/sw.js
       - name: Check required Stage 10.1 features
         run: |
@@ -34,4 +36,13 @@ jobs:
           grep -q "PIN" amp-club-stage10-1/app-f.js
           grep -q "Telegram" amp-club-stage10-1/app-f.js
           grep -q "MAX" amp-club-stage10-1/app-f.js
+          grep -q "client-only" amp-club-stage10-1/client-role.js
+          grep -q "AMP_LEGAL_VERSION" amp-club-stage10-1/legal-ui.js
+          grep -q "legalAge" amp-club-stage10-1/legal-ui.js
+          grep -q "legalPd" amp-club-stage10-1/legal-ui.js
+          grep -q "legalMarketing" amp-club-stage10-1/legal-ui.js
+          grep -q "privacy@amplituda-nn.ru" amp-club-stage10-1/legal/privacy.html
+          grep -q "Это согласие оформляется отдельно" amp-club-stage10-1/legal/personal-data-consent.html
+          grep -q "Это согласие необязательно" amp-club-stage10-1/legal/marketing-consent.html
+          grep -q "АМы не сгорают" amp-club-stage10-1/legal/rules.html
           grep -q "manifest.webmanifest" amp-club-stage10-1/index.html
