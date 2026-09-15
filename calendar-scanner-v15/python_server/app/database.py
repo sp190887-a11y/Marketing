@@ -47,6 +47,29 @@ CREATE TABLE IF NOT EXISTS consent_events (
     source TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS email_codes (
+    email TEXT PRIMARY KEY,
+    code_hash TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 """
 
 
@@ -140,3 +163,64 @@ class Database:
                 "INSERT INTO consent_events(owner_key, document_slug, document_version, accepted, source, created_at) VALUES(?, ?, ?, ?, ?, ?)",
                 (owner_key, slug, version, int(accepted), source, utc_now()),
             )
+
+    def save_email_code(self, email: str, code_hash: str, expires_at: str) -> None:
+        now = utc_now()
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO email_codes(email, code_hash, expires_at, attempts, created_at)
+                   VALUES(?, ?, ?, 0, ?)
+                   ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash,
+                     expires_at=excluded.expires_at, attempts=0, created_at=excluded.created_at""",
+                (email, code_hash, expires_at, now),
+            )
+
+    def get_email_code(self, email: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT code_hash, expires_at, attempts FROM email_codes WHERE email = ?", (email,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def increment_email_attempts(self, email: str) -> None:
+        with self.connect() as connection:
+            connection.execute("UPDATE email_codes SET attempts = attempts + 1 WHERE email = ?", (email,))
+
+    def consume_email_code(self, email: str) -> None:
+        with self.connect() as connection:
+            connection.execute("DELETE FROM email_codes WHERE email = ?", (email,))
+
+    def get_or_create_user(self, email: str) -> dict[str, Any]:
+        now = utc_now()
+        with self.connect() as connection:
+            row = connection.execute("SELECT id, email FROM users WHERE email = ?", (email,)).fetchone()
+            if row:
+                connection.execute("UPDATE users SET updated_at = ? WHERE id = ?", (now, row["id"]))
+                return dict(row)
+            user_id = "usr_" + __import__("secrets").token_hex(12)
+            connection.execute(
+                "INSERT INTO users(id, email, created_at, updated_at) VALUES(?, ?, ?, ?)",
+                (user_id, email, now, now),
+            )
+        return {"id": user_id, "email": email}
+
+    def save_session(self, token_hash: str, user_id: str, expires_at: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "INSERT INTO sessions(token_hash, user_id, expires_at, created_at) VALUES(?, ?, ?, ?)",
+                (token_hash, user_id, expires_at, utc_now()),
+            )
+
+    def get_session_user(self, token_hash: str, now: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT users.id, users.email FROM sessions
+                   JOIN users ON users.id = sessions.user_id
+                   WHERE sessions.token_hash = ? AND sessions.expires_at > ?""",
+                (token_hash, now),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def delete_session(self, token_hash: str) -> None:
+        with self.connect() as connection:
+            connection.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
