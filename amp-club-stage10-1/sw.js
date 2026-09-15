@@ -1,5 +1,5 @@
-const CACHE='amp-club-stage10-1-5';
-const ASSETS=['./','./index.html','./styles.css?v=10.1.5','./overrides.css?v=10.1.5','./app-a.js?v=10.1.5','./app-b.js?v=10.1.5','./app-c.js?v=10.1.5','./app-d.js?v=10.1.5','./app-e.js?v=10.1.5','./save-links.js?v=10.1.5','./app-f.js?v=10.1.5','./amp-logo.svg?v=10.1.5','./manifest.webmanifest?v=10.1.5'];
+const CACHE='amp-club-stage10-1-7';
+const ASSETS=['./','./index.html','./styles.css?v=10.1.7','./overrides.css?v=10.1.7','./legal-ui.css?v=10.1.7','./app-a.js?v=10.1.7','./app-b.js?v=10.1.7','./app-c.js?v=10.1.7','./app-d.js?v=10.1.7','./app-e.js?v=10.1.7','./save-links.js?v=10.1.7','./app-f.js?v=10.1.7','./client-role.js?v=10.1.7','./legal-ui.js?v=10.1.7','./amp-logo.svg?v=10.1.7','./manifest.webmanifest?v=10.1.7','./legal/index.html','./legal/legal.css','./legal/privacy.html','./legal/personal-data-consent.html','./legal/marketing-consent.html','./legal/rules.html','./legal/cookies.html','./legal/withdrawal.html'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith(fetch(e.request).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return r}).catch(()=>caches.match(e.request).then(r=>r||caches.match('./index.html'))))});
