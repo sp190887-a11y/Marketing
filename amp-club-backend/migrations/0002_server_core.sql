@@ -6,9 +6,8 @@ ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS permissions jsonb NOT NULL DEFA
 ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS failed_login_attempts integer NOT NULL DEFAULT 0;
 ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS locked_until timestamptz;
 ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS mfa_required boolean NOT NULL DEFAULT false;
-DO $$ BEGIN
-    ALTER TABLE admin_users ADD CONSTRAINT admin_users_role_check CHECK (role IN ('owner','manager','operator','auditor'));
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE admin_users DROP CONSTRAINT IF EXISTS admin_users_role_check;
+ALTER TABLE admin_users ADD CONSTRAINT admin_users_role_check CHECK (role IN ('owner','manager','operator','auditor'));
 
 ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS ip_address inet;
 ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS user_agent text;
@@ -90,11 +89,11 @@ CREATE TABLE IF NOT EXISTS support_tickets (
 );
 CREATE INDEX IF NOT EXISTS support_tickets_customer_idx ON support_tickets(customer_id, created_at DESC);
 
-CREATE OR REPLACE FUNCTION amp_deny_immutable_mutation() RETURNS trigger AS $$
-BEGIN
-    RAISE EXCEPTION 'immutable_table';
-END;
-$$ LANGUAGE plpgsql;
+CREATE OR REPLACE FUNCTION amp_deny_immutable_mutation() RETURNS trigger
+LANGUAGE plpgsql
+AS 'BEGIN
+    RAISE EXCEPTION ''immutable_table'';
+END';
 
 DROP TRIGGER IF EXISTS consent_ledger_immutable ON consent_ledger;
 CREATE TRIGGER consent_ledger_immutable
@@ -106,32 +105,32 @@ CREATE TRIGGER am_ledger_immutable
 BEFORE UPDATE OR DELETE ON am_ledger
 FOR EACH ROW EXECUTE FUNCTION amp_deny_immutable_mutation();
 
-CREATE OR REPLACE FUNCTION amp_protect_customer_balance() RETURNS trigger AS $$
-BEGIN
+CREATE OR REPLACE FUNCTION amp_protect_customer_balance() RETURNS trigger
+LANGUAGE plpgsql
+AS 'BEGIN
     IF NEW.balance_am IS DISTINCT FROM OLD.balance_am
-       AND COALESCE(current_setting('amp.ledger_balance_write', true),'off') <> 'on' THEN
-        RAISE EXCEPTION 'balance_must_be_changed_through_ledger';
+       AND COALESCE(current_setting(''amp.ledger_balance_write'', true),''off'') <> ''on'' THEN
+        RAISE EXCEPTION ''balance_must_be_changed_through_ledger'';
     END IF;
     RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+END';
 
 DROP TRIGGER IF EXISTS customers_balance_guard ON customers;
 CREATE TRIGGER customers_balance_guard
 BEFORE UPDATE OF balance_am ON customers
 FOR EACH ROW EXECUTE FUNCTION amp_protect_customer_balance();
 
-CREATE OR REPLACE FUNCTION amp_apply_ledger_balance() RETURNS trigger AS $$
-BEGIN
-    PERFORM set_config('amp.ledger_balance_write','on',true);
+CREATE OR REPLACE FUNCTION amp_apply_ledger_balance() RETURNS trigger
+LANGUAGE plpgsql
+AS 'BEGIN
+    PERFORM set_config(''amp.ledger_balance_write'',''on'',true);
     UPDATE customers
        SET balance_am = balance_am + NEW.amount,
            updated_at = now()
      WHERE id = NEW.customer_id;
-    PERFORM set_config('amp.ledger_balance_write','off',true);
+    PERFORM set_config(''amp.ledger_balance_write'',''off'',true);
     RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+END';
 
 DROP TRIGGER IF EXISTS am_ledger_apply_balance ON am_ledger;
 CREATE TRIGGER am_ledger_apply_balance
