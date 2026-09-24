@@ -10,7 +10,7 @@ os.environ["OTP_PEPPER"] = "ci-test-pepper"
 os.environ["ADMIN_BOOTSTRAP_TOKEN"] = "ci-bootstrap-token"
 
 from api.app import app  # noqa: E402
-from api.index import db  # noqa: E402
+from api.index import db, token_hash  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATIONS = ROOT / "migrations"
@@ -98,6 +98,7 @@ def test_default_club_number_and_manager_catalog(client):
     assert managers[1] == "Настя"
     assert managers[2] == "Ирина"
     assert managers[3] == "Алёна"
+    assert managers[4] == "AmDesign"
 
 
 def test_assign_change_unassign_manager_keeps_permanent_member_number(client):
@@ -178,3 +179,55 @@ def test_lookup_by_club_code_phone_crm_and_permanent_number(client):
     ).get_json()["customers"][0]
     assert code_result["club_code"] == code
     assert code_result["manager_name"] == "Ирина"
+
+
+def test_client_sees_assigned_manager_and_contact_buttons_data(client):
+    customer = create_customer()
+    admin_token = bootstrap_admin(client)
+
+    contacts = client.patch(
+        "/api/admin/managers/4",
+        headers=auth(admin_token),
+        json={
+            "phone": "+7 831 282-05-80",
+            "email": "amdesign@example.ru",
+            "telegram_url": "https://t.me/amdesign_test",
+            "vk_url": "https://vk.com/amdesign_test",
+            "max_url": "https://max.ru/amdesign_test",
+        },
+    )
+    assert contacts.status_code == 200, contacts.get_json()
+
+    assigned = client.post(
+        f"/api/admin/customers/{customer['id']}/manager",
+        headers=auth(admin_token),
+        json={"manager_code": 4, "reason": "Клиент AmDesign"},
+    )
+    assert assigned.status_code == 200, assigned.get_json()
+    assert assigned.get_json()["club_code"].startswith("A4-")
+
+    raw_token = "client-manager-test-token"
+    with db() as con, con.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO auth_sessions(subject_type,subject_id,token_hash,expires_at)
+            VALUES ('client',%s,%s,now()+interval '1 day')
+            """,
+            (customer["id"], token_hash(raw_token)),
+        )
+        con.commit()
+
+    response = client.get(
+        "/api/client/manager",
+        headers={"Authorization": f"Bearer {raw_token}"},
+    )
+    assert response.status_code == 200, response.get_json()
+    payload = response.get_json()
+    assert payload["assigned"] is True
+    assert payload["club_code"].startswith("A4-")
+    assert payload["manager"]["name"] == "AmDesign"
+    assert payload["manager"]["phone"] == "+7 831 282-05-80"
+    assert payload["manager"]["email"] == "amdesign@example.ru"
+    assert payload["manager"]["telegram_url"].startswith("https://t.me/")
+    assert payload["manager"]["vk_url"].startswith("https://vk.com/")
+    assert payload["manager"]["max_url"].startswith("https://max.ru/")
