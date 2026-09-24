@@ -3,6 +3,11 @@ CREATE SEQUENCE IF NOT EXISTS club_member_number_seq START WITH 1;
 CREATE TABLE IF NOT EXISTS club_managers (
     code smallint PRIMARY KEY CHECK (code >= 0 AND code <= 99),
     name text NOT NULL,
+    phone text,
+    email text,
+    telegram_url text,
+    vk_url text,
+    max_url text,
     is_active boolean NOT NULL DEFAULT true,
     sort_order integer NOT NULL DEFAULT 0,
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -14,7 +19,8 @@ VALUES
 (0,'Не закреплён',true,0),
 (1,'Настя',true,1),
 (2,'Ирина',true,2),
-(3,'Алёна',true,3)
+(3,'Алёна',true,3),
+(4,'AmDesign',true,4)
 ON CONFLICT(code) DO UPDATE SET
     name=EXCLUDED.name,
     is_active=EXCLUDED.is_active,
@@ -53,6 +59,11 @@ SELECT
     c.manager_code,
     ('A' || c.manager_code::text || '-' || lpad(c.club_member_no::text,5,'0')) AS club_code,
     m.name AS manager_name,
+    m.phone AS manager_phone,
+    m.email AS manager_email,
+    m.telegram_url AS manager_telegram_url,
+    m.vk_url AS manager_vk_url,
+    m.max_url AS manager_max_url,
     m.is_active AS manager_active
 FROM customers c
 JOIN club_managers m ON m.code=c.manager_code;
