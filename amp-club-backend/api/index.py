@@ -33,13 +33,15 @@ ADMIN_SESSION_HOURS = int(os.environ.get("ADMIN_SESSION_HOURS", "12"))
 
 CLIENT_FIELDS = """
 id,phone,name,birth_date,gender,discount_percent,balance_am,ruble_remainder,
-crm_number,telegram_linked,max_linked,is_active,created_at,updated_at
+crm_number,club_member_no,manager_code,
+('A' || manager_code::text || '-' || lpad(club_member_no::text,5,'0')) AS club_code,
+telegram_linked,max_linked,is_active,created_at,updated_at
 """.replace("\n", "")
 
 ROLE_PERMISSIONS = {
-    "owner": {"customer_read", "ledger_adjust", "audit_read", "support_read"},
-    "manager": {"customer_read", "ledger_adjust", "support_read"},
-    "operator": {"customer_read", "ledger_adjust", "support_read"},
+    "owner": {"customer_read", "ledger_adjust", "audit_read", "support_read", "manager_assign"},
+    "manager": {"customer_read", "ledger_adjust", "support_read", "manager_assign"},
+    "operator": {"customer_read", "ledger_adjust", "support_read", "manager_assign"},
     "auditor": {"customer_read", "audit_read"},
 }
 
