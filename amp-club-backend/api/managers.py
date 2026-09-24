@@ -44,7 +44,7 @@ def _clean_email(value):
     value = str(value or "").strip().lower()
     if not value:
         return None
-    if len(value) > 254 or not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", value):
+    if len(value) > 254 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value):
         raise ValueError("invalid_email")
     return value
 
