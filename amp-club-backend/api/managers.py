@@ -2,7 +2,7 @@ import re
 
 from flask import Blueprint, jsonify, request
 
-from .index import add_audit, admin_from_session, db, norm_phone
+from .index import add_audit, admin_from_session, db, norm_phone, session_subject
 
 manager_bp = Blueprint("client_managers", __name__)
 
@@ -21,7 +21,7 @@ def list_managers():
     with db() as con, con.cursor() as cur:
         cur.execute(
             """
-            SELECT code,name,is_active,sort_order
+            SELECT code,name,phone,email,telegram_url,vk_url,max_url,is_active,sort_order
               FROM club_managers
              WHERE is_active=true
              ORDER BY sort_order,code
@@ -29,6 +29,114 @@ def list_managers():
         )
         rows = cur.fetchall()
     return jsonify(managers=rows)
+
+
+def _clean_contact_url(value):
+    value = str(value or "").strip()
+    if not value:
+        return None
+    if len(value) > 500 or not re.match(r"^https://", value, re.I):
+        raise ValueError("invalid_contact_url")
+    return value
+
+
+def _clean_email(value):
+    value = str(value or "").strip().lower()
+    if not value:
+        return None
+    if len(value) > 254 or not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", value):
+        raise ValueError("invalid_email")
+    return value
+
+
+def _clean_phone(value):
+    value = str(value or "").strip()
+    if not value:
+        return None
+    if len(value) > 40 or not re.fullmatch(r"[+0-9() .-]{5,40}", value):
+        raise ValueError("invalid_contact_phone")
+    return value
+
+
+@manager_bp.patch("/api/admin/managers/<int:code>")
+def update_manager_contacts(code):
+    ctx = admin_from_session()
+    if not ctx:
+        return jsonify(error="unauthorized"), 401
+    if ctx["admin"].get("role") != "owner":
+        return jsonify(error="forbidden"), 403
+
+    data = request.get_json(silent=True) or {}
+    try:
+        phone = _clean_phone(data.get("phone")) if "phone" in data else None
+        email = _clean_email(data.get("email")) if "email" in data else None
+        telegram_url = _clean_contact_url(data.get("telegram_url")) if "telegram_url" in data else None
+        vk_url = _clean_contact_url(data.get("vk_url")) if "vk_url" in data else None
+        max_url = _clean_contact_url(data.get("max_url")) if "max_url" in data else None
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+
+    with db() as con, con.cursor() as cur:
+        cur.execute("SELECT * FROM club_managers WHERE code=%s FOR UPDATE", (code,))
+        before = cur.fetchone()
+        if not before:
+            return jsonify(error="manager_not_found"), 404
+        fields = []
+        params = []
+        for key, value in (
+            ("phone", phone), ("email", email), ("telegram_url", telegram_url),
+            ("vk_url", vk_url), ("max_url", max_url),
+        ):
+            if key in data:
+                fields.append(f"{key}=%s")
+                params.append(value)
+        if not fields:
+            return jsonify(error="nothing_to_update"), 400
+        params.append(code)
+        cur.execute(
+            f"UPDATE club_managers SET {', '.join(fields)},updated_at=now() WHERE code=%s RETURNING code,name,phone,email,telegram_url,vk_url,max_url,is_active,sort_order",
+            tuple(params),
+        )
+        manager = cur.fetchone()
+        add_audit(cur, "admin", ctx["admin"]["id"], "manager_contacts_updated", "club_manager", str(code), {"fields": [x.split("=")[0] for x in fields]})
+        con.commit()
+    return jsonify(ok=True, manager=manager)
+
+
+@manager_bp.get("/api/client/manager")
+def client_manager():
+    subject = session_subject("client")
+    if not subject:
+        return jsonify(error="unauthorized"), 401
+    with db() as con, con.cursor() as cur:
+        cur.execute(
+            """
+            SELECT i.club_member_no,i.club_code,i.manager_code,i.manager_name,
+                   i.manager_phone,i.manager_email,i.manager_telegram_url,
+                   i.manager_vk_url,i.manager_max_url,i.manager_active
+              FROM customer_club_identity i
+             WHERE i.customer_id=%s
+            """,
+            (subject["id"],),
+        )
+        row = cur.fetchone()
+    if not row:
+        return jsonify(error="not_found"), 404
+    assigned = int(row["manager_code"]) != 0 and bool(row["manager_active"])
+    return jsonify(
+        assigned=assigned,
+        club_member_no=row["club_member_no"],
+        club_code=row["club_code"],
+        manager=None if not assigned else {
+            "code": row["manager_code"],
+            "name": row["manager_name"],
+            "phone": row["manager_phone"],
+            "email": row["manager_email"],
+            "telegram_url": row["manager_telegram_url"],
+            "vk_url": row["manager_vk_url"],
+            "max_url": row["manager_max_url"],
+        },
+    )
 
 
 @manager_bp.post("/api/admin/customers/<customer_id>/manager")
