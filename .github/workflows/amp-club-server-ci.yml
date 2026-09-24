@@ -52,6 +52,7 @@ jobs:
           python -m py_compile amp-club-backend/api/index.py
           python -m py_compile amp-club-backend/api/crm.py
           python -m py_compile amp-club-backend/api/mfa.py
+          python -m py_compile amp-club-backend/api/managers.py
           python -m py_compile amp-club-backend/api/app.py
       - name: PostgreSQL end-to-end tests
         working-directory: amp-club-backend
